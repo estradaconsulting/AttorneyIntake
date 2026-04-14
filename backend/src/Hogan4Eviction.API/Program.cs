@@ -2,7 +2,6 @@ using Hogan4Eviction.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -15,10 +14,8 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// ── Infrastructure (DB, storage, repos, fee calculator) ──────────────────────
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// ── CORS — allow the React dev server and production domain ──────────────────
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendPolicy", policy =>
@@ -35,19 +32,14 @@ builder.Services.AddCors(options =>
     });
 });
 
-// ── Future: Azure AD auth hook ────────────────────────────────────────────────
-// builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-//     .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
-
 var app = builder.Build();
 
-// ── Migrate DB on startup (dev only — disable for production) ─────────────────
-if (app.Environment.IsDevelopment())
+var autoMigrateDatabase = builder.Configuration.GetValue<bool>("Database:AutoMigrate");
+if (app.Environment.IsDevelopment() && autoMigrateDatabase)
 {
     app.Services.ApplyMigrations();
 }
 
-// ── Middleware pipeline ────────────────────────────────────────────────────────
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -56,10 +48,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("FrontendPolicy");
 app.UseHttpsRedirection();
-
-// app.UseAuthentication();   // Uncomment when Azure AD is configured
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();

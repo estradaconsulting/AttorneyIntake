@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { submitCase } from '../../../services/api'
-import type { IntakeWizardState } from '../../../types/intake'
+import { submitLocalIntake } from '../../../services/api'
+import type { IntakeWizardState, SubmissionCertification } from '../../../types/intake'
 
 interface Props {
   wizardState: IntakeWizardState
@@ -8,19 +8,67 @@ interface Props {
 }
 
 export default function Step8_Confirmation({ wizardState, onBack }: Props) {
-  const [signed, setSigned] = useState(false)
+  const [signerName, setSignerName] = useState(wizardState.certification?.signerName ?? '')
+  const [signedDate, setSignedDate] = useState(
+    wizardState.certification?.signedDate ?? new Date().toISOString().slice(0, 10)
+  )
+  const [signerRole, setSignerRole] = useState<SubmissionCertification['signerRole']>(
+    wizardState.certification?.signerRole ?? 'owner'
+  )
+  const [executionCounty, setExecutionCounty] = useState(
+    wizardState.certification?.executionCounty ?? 'Sacramento'
+  )
+  const [authorizedAgentTitle, setAuthorizedAgentTitle] = useState(
+    wizardState.certification?.authorizedAgentTitle ?? ''
+  )
+  const [signed, setSigned] = useState(wizardState.certification?.agreed ?? false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async () => {
-    if (!signed) { setError('Please check the agreement box to proceed.'); return }
-    if (!wizardState.createdCaseId) { setError('No case ID found. Please go back to the documents step.'); return }
+    if (!signed) {
+      setError('Please check the agreement box to proceed.')
+      return
+    }
+    if (!signerName.trim()) {
+      setError('Please enter the name of the person certifying this submission.')
+      return
+    }
+    if (!signedDate) {
+      setError('Please provide the certification date.')
+      return
+    }
+    if (!executionCounty.trim()) {
+      setError('Please provide the county where this certification was executed.')
+      return
+    }
+    if (signerRole === 'authorized_agent' && !authorizedAgentTitle.trim()) {
+      setError('Please provide the authorized agent title or role.')
+      return
+    }
+    if (!wizardState.step1 || !wizardState.step3) {
+      setError('Missing required intake details. Please go back and complete the earlier steps.')
+      return
+    }
+    if (!wizardState.referenceNumber) {
+      setError('No reference number found. Please go back to the documents step.')
+      return
+    }
 
     setSubmitting(true)
     setError(null)
+
     try {
-      await submitCase(wizardState.createdCaseId)
+      await submitLocalIntake(wizardState, {
+        signerName: signerName.trim(),
+        signedDate,
+        signerRole,
+        executionCounty: executionCounty.trim(),
+        authorizedAgentTitle:
+          signerRole === 'authorized_agent' ? authorizedAgentTitle.trim() : undefined,
+        agreed: true,
+      })
       setSubmitted(true)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Submission failed. Please try again.')
@@ -32,40 +80,23 @@ export default function Step8_Confirmation({ wizardState, onBack }: Props) {
   if (submitted) {
     return (
       <div className="text-center py-10 space-y-4">
-        <div className="text-5xl">⚖️</div>
+        <div className="text-5xl">Case saved</div>
         <h2 className="text-2xl font-serif font-bold text-[#1e3a5f]">
-          Case Submitted Successfully
+          Intake Saved Successfully
         </h2>
         <p className="text-lg font-semibold text-[#8b1414]">
           Reference Number: {wizardState.referenceNumber}
         </p>
         <p className="text-sm text-gray-600 max-w-md mx-auto">
-          Your intake has been received. The Law Office of Thomas M. Hogan will review your case
-          and contact you at the email/phone provided.
+          Your intake package has been saved locally with the documents and certification details
+          needed for office review.
         </p>
-        <div className="rounded border border-[#b8c4b0] bg-[#d4ddd0] p-4 text-sm text-gray-700 max-w-md mx-auto text-left">
-          <p className="font-semibold mb-2">What happens next?</p>
-          <ul className="space-y-1 text-xs list-disc list-inside">
-            <li>Staff will review your submission within 1–2 business days</li>
-            <li>You may be contacted if additional information or documents are needed</li>
-            <li>In some cases, a consultation with the attorney is required before filing</li>
-            <li>Fees are due in advance of court filing</li>
-          </ul>
-        </div>
-        <div className="text-xs text-gray-500 mt-4">
-          Questions? Call <strong>(916) 929-2255</strong> or email{' '}
-          <a href="mailto:Hogan4eviction@outlook.com" className="text-[#8b1414] hover:underline">
-            Hogan4eviction@outlook.com
-          </a>
-          {' '}and include your reference number in the subject line.
-        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      {/* Summary */}
       <div className="rounded border border-gray-200 overflow-hidden">
         <div className="bg-[#1e2840] text-white px-4 py-3 font-semibold text-sm">
           Case Summary
@@ -73,17 +104,17 @@ export default function Step8_Confirmation({ wizardState, onBack }: Props) {
         <div className="divide-y divide-gray-100 text-sm">
           <div className="px-4 py-2.5 grid grid-cols-2">
             <span className="text-gray-500">Property Owner</span>
-            <span className="font-medium">{wizardState.step1?.name ?? '—'}</span>
+            <span className="font-medium">{wizardState.step1?.name ?? '-'}</span>
+          </div>
+          <div className="px-4 py-2.5 grid grid-cols-2">
+            <span className="text-gray-500">All Known Adult Tenants</span>
+            <span className="font-medium">
+              {wizardState.step3?.tenants?.map(t => t.fullName).join(', ') ?? '-'}
+            </span>
           </div>
           <div className="px-4 py-2.5 grid grid-cols-2">
             <span className="text-gray-500">Property Address</span>
-            <span className="font-medium">{wizardState.step3?.address ?? '—'}</span>
-          </div>
-          <div className="px-4 py-2.5 grid grid-cols-2">
-            <span className="text-gray-500">Tenants</span>
-            <span className="font-medium">
-              {wizardState.step3?.tenants?.map(t => t.fullName).join(', ') ?? '—'}
-            </span>
+            <span className="font-medium">{wizardState.step3?.address ?? '-'}</span>
           </div>
           <div className="px-4 py-2.5 grid grid-cols-2">
             <span className="text-gray-500">Estimated Total Fee</span>
@@ -102,25 +133,108 @@ export default function Step8_Confirmation({ wizardState, onBack }: Props) {
         </div>
       </div>
 
-      {/* Terms & signature */}
       <div className="rounded border border-gray-200 p-4 bg-gray-50 text-xs text-gray-700 space-y-2">
         <h3 className="font-bold text-sm text-[#1e3a5f]">Further Notice & Agreement</h3>
         <ol className="list-decimal list-inside space-y-1.5">
-          <li>Attorney does not warrant time required to prepare, process or complete any legal action.</li>
-          <li>Attorney fees charged may not equal fees that may or may not be awarded by a court.</li>
-          <li>Clients must provide accurate information and have followed applicable laws to obtain the best results.</li>
-          <li>All properties with Federally backed loans or subject to Federal Programs (e.g. Sect. 8) require a 30-day notice to pay rent.</li>
-          <li>Acceptance of rent after ANY notice expires voids the notice and you must start over.</li>
+          <li>Attorney does not warrant time required to prepare, process or complete any legal action. Time is required to evaluate, prepare, and submit cases to court after which all cases may be subject to significant additional administrative time within the court process. Attorney cannot guarantee Client will prevail due to variables that can arise in any legal action.</li>
+          <li>Attorneys fees charged may not equal fees that may or may not be awarded by a court.</li>
+          <li>Clients must provide accurate information and have followed applicable laws to obtain the best results, including but not limited to rent increases within legal limits based on State and Local laws in effect at the time of the increase. Most California properties are subject to Rent Control, Eviction Control, and/or the Federal CARES Act.</li>
+          <li>All properties with federally backed loans or subject to federal programs such as Section 8 are subject to the CARES Act and require a 30-day notice to pay rent.</li>
+          <li>Leases should be kept up to date to avoid defaulting otherwise exempt properties into rent control.</li>
+          <li>If full rent is tendered within the time to comply with a notice to pay rent or quit, that rent must be accepted. If it is less than full payment, it may be rejected, but if any part is accepted, the notice is void.</li>
+          <li>Acceptance of rent after any notice expires voids the notice and you must start over from the beginning.</li>
           <li>Services are for recovery of possession of real property and do not include collection or money judgments.</li>
-          <li>There will be a <strong>$300 processing fee</strong> for any case cancelled prior to filing. No refunds after case is submitted to court.</li>
+          <li>By signing below, Client affirms that the information given is true and all terms, including the attached fee schedule, are understood and agreed. Incorrect or incomplete information may result in delay or loss of case.</li>
         </ol>
       </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="form-label">
+            Name of Person Certifying Submission <span className="ml-0.5 text-red-500">*</span>
+          </label>
+          <input
+            value={signerName}
+            onChange={e => {
+              setSignerName(e.target.value)
+              setError(null)
+            }}
+            className="form-input"
+            placeholder="Full name"
+          />
+        </div>
+        <div>
+          <label className="form-label">
+            Signer Role <span className="ml-0.5 text-red-500">*</span>
+          </label>
+          <select
+            value={signerRole}
+            onChange={e => {
+              setSignerRole(e.target.value as SubmissionCertification['signerRole'])
+              setError(null)
+            }}
+            className="form-input bg-white"
+          >
+            <option value="owner">Property Owner</option>
+            <option value="manager">Property Manager</option>
+            <option value="authorized_agent">Authorized Agent</option>
+          </select>
+        </div>
+        <div>
+          <label className="form-label">
+            Date Signed <span className="ml-0.5 text-red-500">*</span>
+          </label>
+          <input
+            type="date"
+            value={signedDate}
+            onChange={e => {
+              setSignedDate(e.target.value)
+              setError(null)
+            }}
+            className="form-input"
+          />
+        </div>
+        <div>
+          <label className="form-label">
+            County of Execution <span className="ml-0.5 text-red-500">*</span>
+          </label>
+          <input
+            value={executionCounty}
+            onChange={e => {
+              setExecutionCounty(e.target.value)
+              setError(null)
+            }}
+            className="form-input"
+            placeholder="Sacramento"
+          />
+        </div>
+      </div>
+
+      {signerRole === 'authorized_agent' && (
+        <div>
+          <label className="form-label">
+            Authorized Agent Title <span className="ml-0.5 text-red-500">*</span>
+          </label>
+          <input
+            value={authorizedAgentTitle}
+            onChange={e => {
+              setAuthorizedAgentTitle(e.target.value)
+              setError(null)
+            }}
+            className="form-input"
+            placeholder="Agent, custodian of records, office manager, etc."
+          />
+        </div>
+      )}
 
       <label className="flex items-start gap-3 cursor-pointer">
         <input
           type="checkbox"
           checked={signed}
-          onChange={e => { setSigned(e.target.checked); setError(null) }}
+          onChange={e => {
+            setSigned(e.target.checked)
+            setError(null)
+          }}
           className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#8b1414]"
         />
         <span className="text-sm text-gray-700">
@@ -134,14 +248,14 @@ export default function Step8_Confirmation({ wizardState, onBack }: Props) {
 
       <div className="flex justify-between pt-4">
         <button type="button" onClick={onBack} disabled={submitting} className="btn-secondary">
-          ← Back
+          Back
         </button>
         <button
           onClick={handleSubmit}
           disabled={submitting || !signed}
           className="btn-primary"
         >
-          {submitting ? 'Submitting…' : 'Submit Case to Law Office'}
+          {submitting ? 'Saving...' : 'Submit Case to Law Office'}
         </button>
       </div>
     </div>

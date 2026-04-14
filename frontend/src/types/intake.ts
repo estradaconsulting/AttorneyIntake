@@ -121,7 +121,9 @@ export interface Step1_OwnerData {
   name: string
   address: string
   phone: string
+  alternatePhone?: string
   email: string
+  fax?: string
   ownerTypes: OwnerType[]
   trusteeName?: string
 }
@@ -133,6 +135,7 @@ export interface Step2_ManagerData {
   address?: string
   phone?: string
   email?: string
+  fax?: string
 }
 
 export interface Step3_PropertyData {
@@ -177,6 +180,10 @@ export interface Step4_EvictionCauseData {
   pendingApplicationForNoticeAmount: boolean
   pendingApplicationAfterNoticeDate: boolean
   nonMilitaryConfirmed: boolean
+  nonMilitaryStatusBasis?: 'a' | 'b' | 'c' | 'd' | 'e' | 'f'
+  nonMilitaryDischargeDate?: string
+  nonMilitaryOtherExplanation?: string
+  rentalAssistanceDeclarantRole?: 'owner' | 'manager'
 }
 
 export interface Step5_NoticeRequestData {
@@ -203,6 +210,16 @@ export interface Step5_NoticeRequestData {
   noAgreement: boolean
 }
 
+export interface PaymentAuthorizationData {
+  acknowledgeOfficeWillCollectCardLater: boolean
+  cardholderName: string
+  billingPhone?: string
+  billingZip?: string
+  authorizedAmount?: number
+  preferredFollowUp?: 'phone' | 'email'
+  notes?: string
+}
+
 export interface UploadedDocument {
   id: number
   documentType: DocumentType
@@ -211,12 +228,32 @@ export interface UploadedDocument {
   uploadedAt: string
 }
 
+export interface PendingDocumentUpload {
+  file: File
+  documentType: DocumentType
+}
+
+export interface SubmissionCertification {
+  signerName: string
+  signedDate: string
+  signerRole: 'owner' | 'manager' | 'authorized_agent'
+  executionCounty: string
+  authorizedAgentTitle?: string
+  agreed: boolean
+}
+
 // ── API response types ────────────────────────────────────────────────────────
 
 export interface IntakeCaseCreatedResponse {
   id: number
   referenceNumber: string
   status: CaseStatus
+  message: string
+}
+
+export interface LocalSubmissionResponse {
+  referenceNumber: string
+  savedAt: string
   message: string
 }
 
@@ -245,7 +282,10 @@ export interface IntakeWizardState {
   step3?: Step3_PropertyData
   step4?: Step4_EvictionCauseData
   step5?: Step5_NoticeRequestData
+  paymentAuthorization?: PaymentAuthorizationData
   createdCaseId?: number
   referenceNumber?: string
   feeEstimate?: FeeCalculationResult
+  documents?: PendingDocumentUpload[]
+  certification?: SubmissionCertification
 }

@@ -27,6 +27,7 @@ project.lock.json
 
 # Docker volumes
 uploads/
+backend/src/Hogan4Eviction.API/intake-submissions/
 
 # OS
 .DS_Store

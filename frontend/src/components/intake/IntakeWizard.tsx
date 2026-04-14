@@ -7,6 +7,7 @@ import Step3_PropertyInfo from './steps/Step3_PropertyInfo'
 import Step4_EvictionCause from './steps/Step4_EvictionCause'
 import Step5_NoticeRequest from './steps/Step5_NoticeRequest'
 import Step6_FeeReview from './steps/Step6_FeeReview'
+import Step7_PaymentAuthorization from './steps/Step7_PaymentAuthorization'
 import Step7_Documents from './steps/Step7_Documents'
 import Step8_Confirmation from './steps/Step8_Confirmation'
 
@@ -17,6 +18,7 @@ const STEPS = [
   { label: 'Eviction', description: 'Cause for Eviction' },
   { label: 'Notice',   description: 'Notice Request' },
   { label: 'Fees',     description: 'Fee Estimate' },
+  { label: 'Payment', description: 'Payment Authorization' },
   { label: 'Documents', description: 'Upload Documents' },
   { label: 'Confirm',  description: 'Submit & Confirm' },
 ]
@@ -93,14 +95,25 @@ export default function IntakeWizard() {
           />
         )}
         {currentStep === 7 && (
-          <Step7_Documents
-            wizardState={wizardState}
-            onCaseCreated={(caseId, refNum) => updateState({ createdCaseId: caseId, referenceNumber: refNum })}
-            onNext={goNext}
+          <Step7_PaymentAuthorization
+            defaultValues={wizardState.paymentAuthorization}
+            onNext={data => { updateState({ paymentAuthorization: data }); goNext() }}
             onBack={goBack}
           />
         )}
         {currentStep === 8 && (
+          <Step7_Documents
+            wizardState={wizardState}
+            onPrepared={(refNum, documents) => updateState({
+              createdCaseId: undefined,
+              referenceNumber: refNum,
+              documents,
+            })}
+            onNext={goNext}
+            onBack={goBack}
+          />
+        )}
+        {currentStep === 9 && (
           <Step8_Confirmation
             wizardState={wizardState}
             onBack={goBack}

@@ -3,6 +3,8 @@ using Hogan4Eviction.Core.Enums;
 using Hogan4Eviction.Core.Interfaces;
 using Hogan4Eviction.Core.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Hogan4Eviction.API.Controllers;
 
@@ -12,11 +14,16 @@ public class IntakeCasesController : ControllerBase
 {
     private readonly IIntakeCaseRepository _repo;
     private readonly ILogger<IntakeCasesController> _logger;
+    private readonly IWebHostEnvironment _environment;
 
-    public IntakeCasesController(IIntakeCaseRepository repo, ILogger<IntakeCasesController> logger)
+    public IntakeCasesController(
+        IIntakeCaseRepository repo,
+        ILogger<IntakeCasesController> logger,
+        IWebHostEnvironment environment)
     {
         _repo = repo;
         _logger = logger;
+        _environment = environment;
     }
 
     /// <summary>List all submitted intake cases (staff view).</summary>
@@ -80,21 +87,120 @@ public class IntakeCasesController : ControllerBase
                 "Please upload your supporting documents and then submit."));
     }
 
+    [HttpPost("local-submit")]
+    [RequestSizeLimit(52_428_800)]
+    public async Task<ActionResult> LocalSubmit(
+        [FromForm] string submissionJson,
+        [FromForm] List<IFormFile>? files,
+        [FromForm] List<int>? fileDocumentTypes,
+        CancellationToken ct)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(submissionJson);
+            var referenceNumber = document.RootElement.TryGetProperty("referenceNumber", out var refProp)
+                ? refProp.GetString()
+                : null;
+
+            if (string.IsNullOrWhiteSpace(referenceNumber))
+            {
+                referenceNumber = $"H{DateTime.UtcNow.Year}-{Random.Shared.Next(1000, 9999)}-LOCAL";
+            }
+
+            var basePath = Path.Combine(_environment.ContentRootPath, "intake-submissions");
+            var submissionPath = Path.Combine(basePath, referenceNumber);
+            var documentsPath = Path.Combine(submissionPath, "documents");
+
+            Directory.CreateDirectory(documentsPath);
+
+            var storedFiles = new List<object>();
+            for (var i = 0; i < (files?.Count ?? 0); i++)
+            {
+                var file = files![i];
+                if (file.Length == 0) continue;
+
+                var safeName = Path.GetFileName(file.FileName);
+                var outputName = $"{i + 1:D2}_{safeName}";
+                var outputPath = Path.Combine(documentsPath, outputName);
+
+                await using var stream = System.IO.File.Create(outputPath);
+                await file.CopyToAsync(stream, ct);
+
+                storedFiles.Add(new
+                {
+                    originalFileName = safeName,
+                    storedFileName = outputName,
+                    documentType = fileDocumentTypes is not null && i < fileDocumentTypes.Count
+                        ? (int?)fileDocumentTypes[i]
+                        : null,
+                    fileSizeBytes = file.Length,
+                    contentType = file.ContentType
+                });
+            }
+
+            var savedAt = DateTime.UtcNow;
+            var payload = JsonSerializer.Deserialize<object>(submissionJson);
+            var envelope = new
+            {
+                referenceNumber,
+                savedAt,
+                storageMode = "local-filesystem",
+                submission = payload,
+                storedFiles
+            };
+
+            var jsonPath = Path.Combine(submissionPath, "submission.json");
+            await System.IO.File.WriteAllTextAsync(
+                jsonPath,
+                JsonSerializer.Serialize(envelope, new JsonSerializerOptions { WriteIndented = true }),
+                ct);
+
+            _logger.LogInformation("Local intake submission saved at {Path} for {ReferenceNumber}.", jsonPath, referenceNumber);
+
+            return Ok(new
+            {
+                referenceNumber,
+                savedAt,
+                message = $"Submission saved locally to {jsonPath}"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while saving local submission.");
+            return Problem(title: "Unexpected error while saving local submission.", detail: ex.InnerException?.Message ?? ex.Message, statusCode: 500);
+        }
+    }
+
     /// <summary>Submit a draft case for review by the law office.</summary>
     [HttpPost("{id:int}/submit")]
     public async Task<ActionResult> Submit(int id, CancellationToken ct)
     {
-        var c = await _repo.GetByIdAsync(id, ct);
-        if (c is null) return NotFound();
-        if (c.Status != CaseStatus.Draft)
-            return BadRequest("Only draft cases can be submitted.");
+        try
+        {
+            var c = await _repo.GetByIdAsync(id, ct);
+            if (c is null) return NotFound();
+            if (c.Status != CaseStatus.Draft)
+                return BadRequest("Only draft cases can be submitted.");
 
-        c.Status = CaseStatus.Submitted;
-        c.SubmittedAt = DateTime.UtcNow;
-        await _repo.UpdateAsync(c, ct);
+            c.Status = CaseStatus.Submitted;
+            c.SubmittedAt = DateTime.UtcNow;
+            await _repo.UpdateAsync(c, ct);
 
-        _logger.LogInformation("Case {RefNum} submitted for review.", c.ReferenceNumber);
-        return NoContent();
+            _logger.LogInformation("Case {RefNum} submitted for review.", c.ReferenceNumber);
+            return NoContent();
+        }
+        catch (DbUpdateException ex)
+        {
+            var detail = ex.InnerException?.Message ?? ex.Message;
+            _logger.LogError(ex, "Database error while submitting case {CaseId}.", id);
+            return Problem(title: "Database error while submitting case.", detail: detail, statusCode: 500);
+        }
+        catch (Exception ex)
+        {
+            var detail = ex.InnerException?.Message ?? ex.Message;
+            _logger.LogError(ex, "Unexpected error while submitting case {CaseId}.", id);
+            return Problem(title: "Unexpected error while submitting case.", detail: detail, statusCode: 500);
+        }
     }
 
     /// <summary>Update case status (staff only — future: add [Authorize(Roles="Staff")]).</summary>

@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function Step2_ManagerInfo({ defaultValues, onNext, onBack }: Props) {
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<Step2_ManagerData>({
+  const { register, handleSubmit, watch } = useForm<Step2_ManagerData>({
     defaultValues: defaultValues ?? { hasManager: false },
   })
 
@@ -46,6 +46,10 @@ export default function Step2_ManagerInfo({ defaultValues, onNext, onBack }: Pro
 
           <FormField label="Manager's Email" className="sm:col-span-2">
             <Input {...register('email')} type="email" placeholder="manager@example.com" />
+          </FormField>
+
+          <FormField label="Manager's Fax" className="sm:col-span-2">
+            <Input {...register('fax')} type="tel" placeholder="Optional fax number" />
           </FormField>
         </div>
       )}

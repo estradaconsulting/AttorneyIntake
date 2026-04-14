@@ -2,12 +2,15 @@ import axios from 'axios'
 import type {
   IntakeCaseCreatedResponse,
   FeeCalculationResult,
+  LocalSubmissionResponse,
+  SubmissionCertification,
   Step1_OwnerData,
   Step2_ManagerData,
   Step3_PropertyData,
   Step4_EvictionCauseData,
   Step5_NoticeRequestData,
   DocumentType,
+  IntakeWizardState,
   PropertyLocation,
 } from '../types/intake'
 
@@ -16,6 +19,24 @@ const baseURL = import.meta.env.VITE_API_URL
   : '/api'
 
 const api = axios.create({ baseURL })
+
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const serverMessage = typeof error.response?.data === 'string'
+      ? error.response.data
+      : [
+          error.response?.data?.title,
+          error.response?.data?.detail,
+          error.response?.data?.message,
+        ]
+          .filter((value): value is string => Boolean(value && value.trim()))
+          .join(': ')
+
+    return serverMessage || error.message || fallback
+  }
+
+  return error instanceof Error ? error.message : fallback
+}
 
 // ── Intake Cases ──────────────────────────────────────────────────────────────
 
@@ -31,7 +52,9 @@ export async function createIntakeCase(data: {
       name: data.owner.name,
       address: data.owner.address,
       phone: data.owner.phone,
+      alternatePhone: data.owner.alternatePhone,
       email: data.owner.email,
+      fax: data.owner.fax,
       ownerTypes: data.owner.ownerTypes.map(Number),  // DOM returns strings; API expects ints
       trusteeName: data.owner.trusteeName,
     },
@@ -42,6 +65,7 @@ export async function createIntakeCase(data: {
           address: data.manager.address,
           phone: data.manager.phone,
           email: data.manager.email,
+          fax: data.manager.fax,
         }
       : null,
     property: {
@@ -116,7 +140,57 @@ export async function createIntakeCase(data: {
 }
 
 export async function submitCase(caseId: number): Promise<void> {
-  await api.post(`/intakecases/${caseId}/submit`)
+  try {
+    await api.post(`/intakecases/${caseId}/submit`)
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'Submission failed. Please try again.'))
+  }
+}
+
+export async function submitLocalIntake(
+  wizardState: IntakeWizardState,
+  certification: SubmissionCertification
+): Promise<LocalSubmissionResponse> {
+  const form = new FormData()
+  const submission = {
+    referenceNumber: wizardState.referenceNumber,
+    submittedAt: new Date().toISOString(),
+    owner: wizardState.step1 ?? null,
+    manager: wizardState.step2 ?? null,
+    property: wizardState.step3 ?? null,
+    evictionCause: wizardState.step4 ?? null,
+    noticeRequest: wizardState.step5 ?? null,
+    paymentAuthorization: wizardState.paymentAuthorization ?? null,
+    feeEstimate: wizardState.feeEstimate ?? null,
+    certification,
+    derivedFields: {
+      propertyOwnerName: wizardState.step1?.name ?? '',
+      allKnownAdultTenantNames: wizardState.step3?.tenants?.map(t => t.fullName).join(', ') ?? '',
+      rentalAssistanceDeclarantRole: wizardState.step4?.rentalAssistanceDeclarantRole ?? '',
+    },
+    documents: (wizardState.documents ?? []).map(doc => ({
+      documentType: doc.documentType,
+      originalFileName: doc.file.name,
+      fileSizeBytes: doc.file.size,
+      contentType: doc.file.type,
+    })),
+  }
+
+  form.append('submissionJson', JSON.stringify(submission))
+
+  for (const doc of wizardState.documents ?? []) {
+    form.append('files', doc.file, doc.file.name)
+    form.append('fileDocumentTypes', String(doc.documentType))
+  }
+
+  try {
+    const response = await api.post<LocalSubmissionResponse>('/intakecases/local-submit', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'Submission failed. Please try again.'))
+  }
 }
 
 // ── Documents ─────────────────────────────────────────────────────────────────

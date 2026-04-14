@@ -8,10 +8,6 @@ interface Props {
   onBack: () => void
 }
 
-// ── Offline fee calculator ────────────────────────────────────────────────────
-// Direct TypeScript port of backend/src/Hogan4Eviction.Core/Services/FeeCalculatorService.cs
-// Keeps the form fully functional even when the API is unreachable.
-
 interface FeeRequest {
   location: PropertyLocation
   isCommercial: boolean
@@ -22,96 +18,112 @@ interface FeeRequest {
 }
 
 function calculateFeeOffline(req: FeeRequest): FeeCalculationResult {
-  const lines: FeeLineItem[] = []
+  const lines: FeeLineItem[] = [
+    { description: 'Consultation Fee (up to 1/2 hour)', amount: 150, isRequired: false },
+    { description: 'Consultation Fee (1 hour)', amount: 300, isRequired: false },
+  ]
 
-  // 1. Notice preparation
   let noticeFee = 0
   if (req.needsNoticePreparation) {
-    const loc = req.location
-    if (loc === PropertyLocation.Sacramento) noticeFee = req.isCommercial ? 200 : 175
-    else if (loc === PropertyLocation.ElkGroveRosevileFolsom) noticeFee = req.isCommercial ? 300 : 200
-    else if (loc === PropertyLocation.Loomis) noticeFee = 200
-    else if (loc === PropertyLocation.YoloDavis) noticeFee = req.isCommercial ? 300 : 250
-    else if (loc === PropertyLocation.AuburnElDoradoGalt) noticeFee = req.isCommercial ? 300 : 250
-    else if (loc === PropertyLocation.Woodland) noticeFee = req.isCommercial ? 300 : 250
-    else if (loc === PropertyLocation.Placer) noticeFee = 250
-    else if (loc === PropertyLocation.WestSacramento) noticeFee = 250
-    else noticeFee = 175
-    lines.push({ description: 'Notice Preparation & Service', amount: noticeFee, isRequired: false })
+    if (req.isCommercial || req.isForeclosure) {
+      noticeFee = req.location === PropertyLocation.Sacramento ? 200 : 300
+    } else if (req.location === PropertyLocation.Sacramento) {
+      noticeFee = 175
+    } else if (req.location === PropertyLocation.ElkGroveRosevileFolsom) {
+      noticeFee = 200
+    } else {
+      noticeFee = 250
+    }
+
+    lines.push({ description: 'Preparation and Service of Notice (or Agreement)', amount: noticeFee, isRequired: false })
   }
 
-  // 2. Base eviction fee
+  const claim = req.claimAmount ?? 0
   let baseFee = 0
   let baseFeeDesc = ''
-  const claim = req.claimAmount ?? 0
 
   if (req.isCommercial) {
     baseFee = req.location === PropertyLocation.Sacramento ? 1350 : 1500
-    if (claim >= 10_000 && claim <= 25_000) baseFee += 250
     baseFeeDesc = 'Commercial Eviction Filing'
+
+    if (claim >= 10_000 && claim <= 25_000) {
+      baseFee += 250
+      lines.push({ description: 'Commercial Claim Amount Add-On ($10k-$25k)', amount: 250, isRequired: true })
+    }
   } else if (claim > 35_000) {
-    const loc = req.location
-    if (loc === PropertyLocation.YoloDavis || loc === PropertyLocation.WestSacramento) baseFee = 2500
-    else if (loc === PropertyLocation.Placer) baseFee = 2500
-    else if (loc === PropertyLocation.AuburnElDoradoGalt) baseFee = 2500
-    else baseFee = 0
+    if (
+      req.location === PropertyLocation.Loomis ||
+      req.location === PropertyLocation.YoloDavis ||
+      req.location === PropertyLocation.AuburnElDoradoGalt ||
+      req.location === PropertyLocation.Woodland ||
+      req.location === PropertyLocation.Placer ||
+      req.location === PropertyLocation.WestSacramento
+    ) {
+      baseFee = 2500
+    } else {
+      baseFee = 0
+    }
     baseFeeDesc = 'Uncontested Eviction (claim > $35k)'
   } else if (claim >= 10_000) {
-    const loc = req.location
-    if (loc === PropertyLocation.Sacramento) baseFee = 1350
-    else baseFee = 1900
-    baseFeeDesc = 'Uncontested Eviction (claim $10k–$35k)'
+    baseFee = req.location === PropertyLocation.Sacramento ? 1350 : 1900
+    baseFeeDesc = 'Uncontested Eviction (claim $10k-$35k)'
   } else {
-    const loc = req.location
-    if (loc === PropertyLocation.Sacramento) baseFee = 995
-    else if (loc === PropertyLocation.ElkGroveRosevileFolsom) baseFee = 1100
-    else if (loc === PropertyLocation.Loomis) baseFee = 1100
-    else if (loc === PropertyLocation.YoloDavis || loc === PropertyLocation.WestSacramento) baseFee = 1100
-    else if (loc === PropertyLocation.AuburnElDoradoGalt) baseFee = 1350
-    else if (loc === PropertyLocation.Woodland) baseFee = 1100
-    else if (loc === PropertyLocation.Placer) baseFee = 1250
+    if (req.location === PropertyLocation.Sacramento) baseFee = 995
+    else if (req.location === PropertyLocation.ElkGroveRosevileFolsom) baseFee = 1100
+    else if (req.location === PropertyLocation.Loomis) baseFee = 1250
+    else if (req.location === PropertyLocation.YoloDavis || req.location === PropertyLocation.WestSacramento) baseFee = 1100
+    else if (req.location === PropertyLocation.AuburnElDoradoGalt) baseFee = 1350
+    else if (req.location === PropertyLocation.Woodland) baseFee = 1100
+    else if (req.location === PropertyLocation.Placer) baseFee = 1250
     else baseFee = 995
-    baseFeeDesc = 'Uncontested Eviction (claim < $10k)'
+
+    baseFeeDesc = 'Uncontested Eviction (claim under $10k)'
   }
 
-  if (baseFee === 0 && !req.isCommercial && claim > 35_000)
-    lines.push({ description: `${baseFeeDesc} — NOT AVAILABLE for this location`, amount: 0, isRequired: false })
-  else
+  if (baseFee === 0 && !req.isCommercial && claim > 35_000) {
+    lines.push({ description: `${baseFeeDesc} - Not Available for this location`, amount: 0, isRequired: false })
+  } else {
     lines.push({ description: baseFeeDesc, amount: baseFee, isRequired: true })
-
-  // 3. Location surcharge
-  let locationSurcharge = 0
-  const surchargeLocations = [PropertyLocation.YoloDavis, PropertyLocation.AuburnElDoradoGalt, PropertyLocation.WestSacramento]
-  if (surchargeLocations.includes(req.location)) {
-    locationSurcharge = 45
-    lines.push({ description: 'Court Appearance Surcharge (Yolo / Auburn / El Dorado)', amount: 45, isRequired: true })
   }
 
-  // 4. Additional defendants
+  let locationSurcharge = 0
+  if (
+    req.location === PropertyLocation.YoloDavis ||
+    req.location === PropertyLocation.Woodland ||
+    req.location === PropertyLocation.WestSacramento ||
+    req.location === PropertyLocation.AuburnElDoradoGalt
+  ) {
+    locationSurcharge = 45
+    lines.push({ description: 'Court Appearance Add-On (Yolo / Auburn / El Dorado)', amount: 45, isRequired: true })
+  }
+
   let additionalDefendantFee = 0
   if (req.numberOfAdditionalDefendants > 0) {
-    const perDef = req.location === PropertyLocation.Sacramento ? 35
-                 : req.location === PropertyLocation.Woodland ? 55
-                 : 45
+    const perDef = req.location === PropertyLocation.Sacramento
+      ? 35
+      : req.location === PropertyLocation.Woodland
+        ? 55
+        : 45
+
     additionalDefendantFee = perDef * req.numberOfAdditionalDefendants
     lines.push({
-      description: `Additional Defendants (${req.numberOfAdditionalDefendants} × $${perDef})`,
+      description: `New Complaint - Additional Defendants (${req.numberOfAdditionalDefendants} x $${perDef})`,
       amount: additionalDefendantFee,
       isRequired: true,
     })
   }
 
-  // 5. Foreclosure add-on
   let foreclosureFee = 0
   if (req.isForeclosure) {
     foreclosureFee = 300
     lines.push({ description: 'Foreclosure Case Add-On', amount: 300, isRequired: true })
   }
 
-  // 6. Standard informational add-ons
-  lines.push({ description: 'Contested Hearing / Trial (if applicable)', amount: 350, isRequired: false })
-  lines.push({ description: 'Default Money Judgment (if applicable)', amount: 350, isRequired: false })
-  lines.push({ description: 'Reposting Writ (if stayed)', amount: 300, isRequired: false })
+  lines.push({ description: 'Contested Hearing / Trial', amount: 350, isRequired: false })
+  lines.push({ description: 'Default Money Judgment (includes stipulation defaults)', amount: 350, isRequired: false })
+  lines.push({ description: 'Reposting Writ', amount: 300, isRequired: false })
+  lines.push({ description: 'Witness Subpoena Preparation and Service', amount: 400, isRequired: false })
+  lines.push({ description: 'Hourly Attorney Rate in Contested Actions', amount: 300, isRequired: false })
 
   const total = noticeFee + baseFee + locationSurcharge + additionalDefendantFee + foreclosureFee
 
@@ -123,14 +135,12 @@ function calculateFeeOffline(req: FeeRequest): FeeCalculationResult {
     foreclosureSurcharge: foreclosureFee,
     estimatedTotal: total,
     disclaimer:
-      'Fees are estimates based on the 2025 price list. Final fees may vary depending on the ' +
-      'number of tenants, property address specifics, and case complexity. ' +
+      'Fees are estimates based on the 2025 price list and attachment. Final fees may vary depending on the ' +
+      'number of tenants, property address specifics, service requirements, and case complexity. ' +
       'Fees are required in advance of filing unless otherwise agreed.',
     lineItems: lines,
   }
 }
-
-// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Step6_FeeReview({ wizardState, onNext, onBack }: Props) {
   const [fees, setFees] = useState<FeeCalculationResult | null>(null)
@@ -161,7 +171,6 @@ export default function Step6_FeeReview({ wizardState, onNext, onBack }: Props) 
         setLoading(false)
       })
       .catch(() => {
-        // API unavailable — calculate locally using the ported fee logic
         setFees(calculateFeeOffline(req))
         setIsOffline(true)
         setLoading(false)
@@ -174,22 +183,22 @@ export default function Step6_FeeReview({ wizardState, onNext, onBack }: Props) 
     <div className="space-y-6">
       <div className="alert-info">
         <strong>Estimated Fee Summary</strong>
-        <p className="text-xs mt-1">
-          Based on your location, case type, and claim amount. Fees are required in advance of filing
-          unless otherwise agreed.
+        <p className="mt-1 text-xs">
+          Based on your selected location, requested services, and claim amount. Fees are required
+          in advance of filing unless otherwise agreed.
         </p>
       </div>
 
       {loading && (
-        <div className="text-center py-8 text-gray-500">
-          <div className="text-3xl mb-2">⚖️</div>
-          Calculating fees…
+        <div className="py-8 text-center text-gray-500">
+          <div className="mb-2 text-3xl">Fee Calculator</div>
+          Calculating fees...
         </div>
       )}
 
       {!loading && isOffline && (
         <div className="alert-warning text-xs">
-          Fee estimate calculated locally — totals will be confirmed by the office before filing.
+          Fee estimate calculated locally. Totals will be confirmed by the office before filing.
         </div>
       )}
 
@@ -198,10 +207,10 @@ export default function Step6_FeeReview({ wizardState, onNext, onBack }: Props) 
           <div className="overflow-hidden rounded border border-gray-200">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[#1e2840] text-white text-left">
+                <tr className="bg-[#1e2840] text-left text-white">
                   <th className="px-4 py-3 font-semibold">Service</th>
-                  <th className="px-4 py-3 font-semibold text-right">Fee</th>
-                  <th className="px-4 py-3 font-semibold text-center w-20">Required</th>
+                  <th className="px-4 py-3 text-right font-semibold">Fee</th>
+                  <th className="w-20 px-4 py-3 text-center font-semibold">Required</th>
                 </tr>
               </thead>
               <tbody>
@@ -209,18 +218,18 @@ export default function Step6_FeeReview({ wizardState, onNext, onBack }: Props) 
                   <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#f5f7f4]'}>
                     <td className="px-4 py-2.5 text-gray-800">{item.description}</td>
                     <td className="px-4 py-2.5 text-right font-mono font-medium">
-                      {item.amount > 0 ? fmt(item.amount) : '—'}
+                      {item.amount > 0 ? fmt(item.amount) : '-'}
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       {item.isRequired
-                        ? <span className="text-green-700 font-bold">✓</span>
-                        : <span className="text-gray-400 text-xs">if applicable</span>}
+                        ? <span className="font-bold text-green-700">yes</span>
+                        : <span className="text-xs text-gray-400">if applicable</span>}
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="bg-[#1e2840] text-white font-bold">
+                <tr className="bg-[#1e2840] font-bold text-white">
                   <td className="px-4 py-3">Estimated Total (Required Fees)</td>
                   <td className="px-4 py-3 text-right font-mono text-lg">{fmt(fees.estimatedTotal)}</td>
                   <td />
@@ -234,20 +243,21 @@ export default function Step6_FeeReview({ wizardState, onNext, onBack }: Props) 
           </div>
 
           <div className="alert-warning text-xs">
-            <strong>Consultation Fee:</strong> $150 for up to ½ hour · $300 for one hour.
-            In some cases a consultation with the attorney may be required before filing.
+            <strong>Additional Possible Charges:</strong> Hearings or trial $350, default money judgment $350,
+            reposting writ $300, witness subpoena preparation and service $400 plus witness fees,
+            and hourly attorney rates of $300 per hour may apply in contested actions.
           </div>
         </>
       )}
 
       <div className="flex justify-between pt-4">
-        <button type="button" onClick={onBack} className="btn-secondary">← Back</button>
+        <button type="button" onClick={onBack} className="btn-secondary">Back</button>
         <button
           onClick={() => fees && onNext(fees)}
           disabled={loading || !fees}
           className="btn-primary"
         >
-          Continue to Documents →
+          Continue to Documents
         </button>
       </div>
     </div>

@@ -104,8 +104,14 @@ export default function Step3_PropertyInfo({ defaultValues, onNext, onBack }: Pr
               <FormField label="Hair Color">
                 <Input {...register(`tenants.${index}.hairColor`)} />
               </FormField>
+              <FormField label="Facial Hair">
+                <Input {...register(`tenants.${index}.facialHair`)} placeholder="Beard, mustache, clean shaven" />
+              </FormField>
               <FormField label="Eyes">
                 <Input {...register(`tenants.${index}.eyes`)} />
+              </FormField>
+              <FormField label="Hairstyle">
+                <Input {...register(`tenants.${index}.hairstyle`)} placeholder="Short, long, braided, shaved, etc." />
               </FormField>
               <FormField label="Car (make/model/color)">
                 <Input {...register(`tenants.${index}.carDescription`)} />

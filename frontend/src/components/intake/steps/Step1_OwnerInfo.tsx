@@ -11,10 +11,12 @@ interface Props {
 // Text-only fields that react-hook-form manages
 interface TextFields {
   name: string
-  address?: string
-  phone?: string
-  email?: string
-  trusteeName?: string
+  address: string
+  phone: string
+  alternatePhone: string
+  email: string
+  fax: string
+  trusteeName: string
 }
 
 export default function Step1_OwnerInfo({ defaultValues, onNext }: Props) {
@@ -34,7 +36,9 @@ export default function Step1_OwnerInfo({ defaultValues, onNext }: Props) {
       name: defaultValues?.name ?? '',
       address: defaultValues?.address ?? '',
       phone: defaultValues?.phone ?? '',
+      alternatePhone: defaultValues?.alternatePhone ?? '',
       email: defaultValues?.email ?? '',
+      fax: defaultValues?.fax ?? '',
       trusteeName: defaultValues?.trusteeName ?? '',
     },
     mode: 'onChange',
@@ -86,8 +90,16 @@ export default function Step1_OwnerInfo({ defaultValues, onNext }: Props) {
           <Input {...register('phone')} type="tel" placeholder="(916) 000-0000" />
         </FormField>
 
+        <FormField label="Alternate Phone #">
+          <Input {...register('alternatePhone')} type="tel" placeholder="Optional alternate number" />
+        </FormField>
+
         <FormField label="Email Address">
           <Input {...register('email')} type="email" placeholder="you@example.com" />
+        </FormField>
+
+        <FormField label="Fax #">
+          <Input {...register('fax')} type="tel" placeholder="Optional fax number" />
         </FormField>
       </div>
 

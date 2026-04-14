@@ -1,6 +1,6 @@
 import { useForm } from 'react-hook-form'
 import type { Step4_EvictionCauseData } from '../../../types/intake'
-import { FormField, Input, Textarea, Checkbox } from '../../common/FormField'
+import { FormField, Input, Textarea, Checkbox, Radio } from '../../common/FormField'
 
 interface Props {
   defaultValues?: Step4_EvictionCauseData
@@ -19,11 +19,14 @@ export default function Step4_EvictionCause({ defaultValues, onNext, onBack }: P
       pendingApplicationForNoticeAmount: false,
       pendingApplicationAfterNoticeDate: false,
       nonMilitaryConfirmed: false,
+      rentalAssistanceDeclarantRole: 'owner',
     }
   })
 
   const noticeServed = watch('noticeServed')
   const rentAccepted = watch('rentAcceptedAfterNoticeExpired')
+  const nonMilitaryConfirmed = watch('nonMilitaryConfirmed')
+  const nonMilitaryStatusBasis = watch('nonMilitaryStatusBasis')
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
@@ -117,6 +120,23 @@ export default function Step4_EvictionCause({ defaultValues, onNext, onBack }: P
             {...register('pendingApplicationAfterNoticeDate')}
           />
         </div>
+        <div className="mt-4 border-l-4 border-[#d4ddd0] pl-4">
+          <p className="text-sm font-medium text-gray-700 mb-2">
+            Who will sign the rental assistance verification form?
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <Radio
+              label="Property Owner"
+              value="owner"
+              {...register('rentalAssistanceDeclarantRole', { required: true })}
+            />
+            <Radio
+              label="Property Manager"
+              value="manager"
+              {...register('rentalAssistanceDeclarantRole', { required: true })}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Non-military declaration (CIV-100) */}
@@ -131,6 +151,66 @@ export default function Step4_EvictionCause({ defaultValues, onNext, onBack }: P
           <a href="https://scra.dmdc.osd.mil/" target="_blank" rel="noreferrer"
              className="text-[#8b1414] hover:underline">scra.dmdc.osd.mil</a>
         </p>
+
+        {nonMilitaryConfirmed && (
+          <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-4 space-y-4">
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Basis for non-military declaration
+              </p>
+              <div className="space-y-2">
+                <Radio
+                  label="I checked military status through public records / DMDC."
+                  value="a"
+                  {...register('nonMilitaryStatusBasis', { required: 'Please select a basis for the declaration' })}
+                />
+                <Radio
+                  label="I am in regular communication with the defendant/respondent and know they are not in military service."
+                  value="b"
+                  {...register('nonMilitaryStatusBasis', { required: 'Please select a basis for the declaration' })}
+                />
+                <Radio
+                  label="I recently contacted the defendant/respondent and they said they are not in military service."
+                  value="c"
+                  {...register('nonMilitaryStatusBasis', { required: 'Please select a basis for the declaration' })}
+                />
+                <Radio
+                  label="The defendant/respondent was discharged from military service on or about this date."
+                  value="d"
+                  {...register('nonMilitaryStatusBasis', { required: 'Please select a basis for the declaration' })}
+                />
+                <Radio
+                  label="The defendant/respondent is not eligible because they are incarcerated or a business entity."
+                  value="e"
+                  {...register('nonMilitaryStatusBasis', { required: 'Please select a basis for the declaration' })}
+                />
+                <Radio
+                  label="Other basis."
+                  value="f"
+                  {...register('nonMilitaryStatusBasis', { required: 'Please select a basis for the declaration' })}
+                />
+              </div>
+              {errors.nonMilitaryStatusBasis && (
+                <p className="form-error mt-1">{errors.nonMilitaryStatusBasis.message}</p>
+              )}
+            </div>
+
+            {nonMilitaryStatusBasis === 'd' && (
+              <FormField label="Approximate Discharge Date" required>
+                <Input {...register('nonMilitaryDischargeDate', { required: 'Please provide the discharge date' })} type="date" />
+              </FormField>
+            )}
+
+            {nonMilitaryStatusBasis === 'f' && (
+              <FormField label="Other Basis Explanation" required>
+                <Textarea
+                  {...register('nonMilitaryOtherExplanation', { required: 'Please explain the basis used for the declaration' })}
+                  placeholder="Describe how you know the tenant is not in active U.S. military service"
+                />
+              </FormField>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-between pt-4">

@@ -49,7 +49,16 @@ public class IntakeCaseRepository : IIntakeCaseRepository
     public async Task<IntakeCase> UpdateAsync(IntakeCase intakeCase, CancellationToken ct = default)
     {
         intakeCase.UpdatedAt = DateTime.UtcNow;
-        _db.IntakeCases.Update(intakeCase);
+
+        // Cases loaded via this repository are already tracked by the current DbContext.
+        // Re-marking the full graph as Modified can trigger unnecessary updates across
+        // related entities and cause submit/save failures.
+        if (_db.Entry(intakeCase).State == EntityState.Detached)
+        {
+            _db.Attach(intakeCase);
+            _db.Entry(intakeCase).State = EntityState.Modified;
+        }
+
         await _db.SaveChangesAsync(ct);
         return intakeCase;
     }
