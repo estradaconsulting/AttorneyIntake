@@ -1,0 +1,55 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04
+    container_name: hogan_db
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "${DB_SA_PASSWORD:-Dev@Password123}"
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqldata:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD" -Q "SELECT 1" -C
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: src/Hogan4Eviction.API/Dockerfile
+    container_name: hogan_api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Server=db,1433;Database=Hogan4EvictionDb;User=sa;Password=${DB_SA_PASSWORD:-Dev@Password123};TrustServerCertificate=True;"
+      Storage__Provider: "Local"                # Switch to "Azure" when ready
+      Storage__LocalPath: "/app/uploads"
+      # Azure hooks (set these when connecting to Azure)
+      # Azure__BlobStorage__ConnectionString: ""
+      # Azure__BlobStorage__ContainerName: "case-documents"
+      # Azure__KeyVault__Uri: ""
+    ports:
+      - "5000:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hogan_web
+    environment:
+      VITE_API_URL: "http://localhost:5000"
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  sqldata:
+  uploads:

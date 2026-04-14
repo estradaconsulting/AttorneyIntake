@@ -1,0 +1,38 @@
+# Environment
+.env
+*.env.local
+
+# .NET
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
+*.DotSettings.user
+
+# NuGet
+**/packages/
+*.nupkg
+project.lock.json
+
+# EF Migrations (keep the folder, ignore generated files if desired)
+# Uncomment if you want to manage migrations separately:
+# **/Migrations/
+
+# Node / Frontend
+**/node_modules/
+**/dist/
+**/build/
+.vite/
+
+# Docker volumes
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo
