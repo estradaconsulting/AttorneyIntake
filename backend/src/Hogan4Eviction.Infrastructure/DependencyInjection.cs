@@ -22,6 +22,13 @@ public static class DependencyInjection
                 sql => sql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)
             ));
 
+        // M-05: Factory needed by AuditLogService to get a fresh context per write
+        services.AddDbContextFactory<AppDbContext>(options =>
+            options.UseSqlServer(
+                configuration.GetConnectionString("DefaultConnection"),
+                sql => sql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)
+            ), ServiceLifetime.Scoped);
+
         // ── Repositories ──────────────────────────────────────────────────
         services.AddScoped<IIntakeCaseRepository, IntakeCaseRepository>();
 
@@ -34,6 +41,9 @@ public static class DependencyInjection
 
         // ── Domain services ───────────────────────────────────────────────
         services.AddSingleton<IFeeCalculatorService, FeeCalculatorService>();
+
+        // ── Audit logging (M-05) ──────────────────────────────────────────
+        services.AddScoped<IAuditService, AuditLogService>();
 
         return services;
     }

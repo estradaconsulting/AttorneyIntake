@@ -65,9 +65,29 @@ public class IntakeCaseRepository : IIntakeCaseRepository
 
     public async Task<string> GenerateReferenceNumberAsync(CancellationToken ct = default)
     {
+        // H-04: Append a 2-byte random hex suffix so reference numbers are not
+        //       sequentially predictable (e.g. H2026-0042-3FA1).
+        // M-03: Retry on collision; the unique DB index is the definitive guard.
         var year = DateTime.UtcNow.Year;
-        var count = await _db.IntakeCases
-            .CountAsync(c => c.CreatedAt.Year == year, ct);
-        return $"H{year}-{(count + 1):D4}";
+
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var count  = await _db.IntakeCases.CountAsync(c => c.CreatedAt.Year == year, ct);
+            var suffix = RandomHex(2);
+            var refNum = $"H{year}-{(count + 1):D4}-{suffix}";
+
+            if (!await _db.IntakeCases.AnyAsync(c => c.ReferenceNumber == refNum, ct))
+                return refNum;
+        }
+
+        // Fallback: guaranteed-unique GUID-derived reference
+        return $"H{year}-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
+    }
+
+    private static string RandomHex(int bytes)
+    {
+        var buf = new byte[bytes];
+        Random.Shared.NextBytes(buf);
+        return Convert.ToHexString(buf);
     }
 }

@@ -1,42 +1,45 @@
+using System.ComponentModel.DataAnnotations;
 using Hogan4Eviction.Core.Enums;
+using Hogan4Eviction.Core.Models;
 
 namespace Hogan4Eviction.Core.DTOs;
 
-// ── Submitted from the React wizard ──────────────────────────────────────────
+// ── Inbound (client-submitted) DTOs ──────────────────────────────────────────
+// M-07: All string fields now carry MaxLength attributes to enforce server-side limits.
 
 public record PropertyOwnerDto(
-    string Name,
-    string? Address,
-    string? Phone,
-    string? Email,
+    [MaxLength(200)] string Name,
+    [MaxLength(500)] string? Address,
+    [MaxLength(20)]  string? Phone,
+    [MaxLength(254)] string? Email,
     List<OwnerType> OwnerTypes,
-    string? TrusteeName
+    [MaxLength(200)] string? TrusteeName
 );
 
 public record PropertyManagerDto(
-    string? Name,
-    string? Company,
-    string? Address,
-    string? Phone,
-    string? Email
+    [MaxLength(200)] string? Name,
+    [MaxLength(200)] string? Company,
+    [MaxLength(500)] string? Address,
+    [MaxLength(20)]  string? Phone,
+    [MaxLength(254)] string? Email
 );
 
 public record TenantDto(
-    string FullName,
-    string? Race,
-    string? Height,
-    string? Weight,
-    string? HairColor,
-    string? FacialHair,
-    string? Eyes,
-    string? Hairstyle,
-    string? CarDescription,
-    string? Comments
+    [MaxLength(200)] string FullName,
+    [MaxLength(100)] string? Race,
+    [MaxLength(50)]  string? Height,
+    [MaxLength(50)]  string? Weight,
+    [MaxLength(50)]  string? HairColor,
+    [MaxLength(100)] string? FacialHair,
+    [MaxLength(50)]  string? Eyes,
+    [MaxLength(100)] string? Hairstyle,
+    [MaxLength(300)] string? CarDescription,
+    [MaxLength(1000)] string? Comments
 );
 
 public record PropertyDto(
-    string Address,
-    string? GateCode,
+    [MaxLength(500)] string Address,
+    [MaxLength(50)]  string? GateCode,
     bool IsResidential,
     bool IsCommercial,
     DateTime? TenantMoveInDate,
@@ -65,9 +68,9 @@ public record PropertyDto(
 
 public record EvictionCauseDto(
     bool NoticeServed,
-    string? NoticeForm,
+    [MaxLength(100)]  string? NoticeForm,
     decimal? AmountOwedAtNotice,
-    string? BalanceCalculationExplanation,
+    [MaxLength(2000)] string? BalanceCalculationExplanation,
     bool IsSubjectToRentEvictionControl,
     bool? HasCompliedWithRentEvictionControlLaws,
     bool RentAcceptedAfterNoticeExpired,
@@ -80,22 +83,22 @@ public record EvictionCauseDto(
 
 public record NoticeRequestDto(
     NoticeType NoticeType,
-    string? OtherNoticeSpecification,
+    [MaxLength(500)]  string? OtherNoticeSpecification,
     bool IsResidential,
     bool IsCommercial,
-    string? TenantPropertyAddress,
+    [MaxLength(500)]  string? TenantPropertyAddress,
     decimal? MonthlyRent,
     decimal? CurrentBalanceDue,
-    string? BalanceCalculationExplanation,
-    string? MethodOfPayment,
+    [MaxLength(2000)] string? BalanceCalculationExplanation,
+    [MaxLength(200)]  string? MethodOfPayment,
     bool PaymentDueOnFirst,
-    string? PaymentRecipient,
-    string? PaymentDeliveryAddress,
-    string? AlternatePaymentAddress,
-    string? TenantContactPhone,
-    string? UsualPaymentDaysHours,
+    [MaxLength(200)]  string? PaymentRecipient,
+    [MaxLength(500)]  string? PaymentDeliveryAddress,
+    [MaxLength(500)]  string? AlternatePaymentAddress,
+    [MaxLength(20)]   string? TenantContactPhone,
+    [MaxLength(200)]  string? UsualPaymentDaysHours,
     bool PaymentByMailOnly,
-    string? OtherCausesForNotice,
+    [MaxLength(2000)] string? OtherCausesForNotice,
     bool HasWrittenAgreement,
     bool IsVerbalOnly,
     bool NoAgreement,
@@ -107,11 +110,15 @@ public record SubmitIntakeCaseRequest(
     PropertyManagerDto? Manager,
     PropertyDto Property,
     EvictionCauseDto? EvictionCause,
-    NoticeRequestDto? NoticeRequest   // null if they already have a valid notice
+    NoticeRequestDto? NoticeRequest
 );
 
-// ── Response ──────────────────────────────────────────────────────────────────
+// ── Response DTOs ─────────────────────────────────────────────────────────────
 
+/// <summary>
+/// Lightweight summary — safe to return to any authenticated caller.
+/// Does NOT include tenant PII fields.
+/// </summary>
 public record IntakeCaseSummaryDto(
     int Id,
     string ReferenceNumber,
@@ -121,6 +128,24 @@ public record IntakeCaseSummaryDto(
     DateTime CreatedAt,
     DateTime? SubmittedAt,
     int DocumentCount
+);
+
+/// <summary>
+/// H-01: Full detail including tenant PII — returned only to authenticated staff
+/// via the [Authorize]-protected GET /api/intakecases/{id} endpoint.
+/// </summary>
+public record IntakeCaseDetailDto(
+    int Id,
+    string ReferenceNumber,
+    CaseStatus Status,
+    DateTime CreatedAt,
+    DateTime? SubmittedAt,
+    PropertyOwner? PropertyOwner,
+    PropertyManager? PropertyManager,
+    Property? Property,
+    EvictionCause? EvictionCause,
+    NoticeRequest? NoticeRequest,
+    IReadOnlyList<CaseDocument> Documents
 );
 
 public record IntakeCaseCreatedDto(

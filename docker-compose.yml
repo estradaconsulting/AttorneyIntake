@@ -4,7 +4,9 @@ services:
     container_name: hogan_db
     environment:
       ACCEPT_EULA: "Y"
-      SA_PASSWORD: "${DB_SA_PASSWORD:-Dev@Password123}"
+      # H-02: No default password fallback — deployment FAILS loudly if not set.
+      # Generate a strong password and set it in .env (never commit .env to git).
+      SA_PASSWORD: "${DB_SA_PASSWORD:?DB_SA_PASSWORD must be set in .env — see .env.example}"
       MSSQL_PID: Developer
     ports:
       - "1433:1433"
@@ -23,13 +25,26 @@ services:
     container_name: hogan_api
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: "Server=db,1433;Database=Hogan4EvictionDb;User=sa;Password=${DB_SA_PASSWORD:-Dev@Password123};TrustServerCertificate=True;"
-      Storage__Provider: "Local"                # Switch to "Azure" when ready
+      # H-07: Use a least-privilege app account, NOT sa.
+      # Create this account in SQL Server before production deployment (see README).
+      ConnectionStrings__DefaultConnection: >-
+        Server=db,1433;
+        Database=Hogan4EvictionDb;
+        User=${DB_APP_USER:?DB_APP_USER must be set};
+        Password=${DB_APP_PASSWORD:?DB_APP_PASSWORD must be set};
+        TrustServerCertificate=${DB_TRUST_CERT:-False}
+      Storage__Provider: "Local"
       Storage__LocalPath: "/app/uploads"
-      # Azure hooks (set these when connecting to Azure)
-      # Azure__BlobStorage__ConnectionString: ""
-      # Azure__BlobStorage__ContainerName: "case-documents"
-      # Azure__KeyVault__Uri: ""
+      # Security flags — dev defaults are permissive; production overrides in .env
+      Security__SwaggerEnabled: "${SWAGGER_ENABLED:-false}"
+      Security__DevAuthEnabled: "${DEV_AUTH_ENABLED:-false}"
+      # Azure hooks — fill these in via .env when switching to Azure
+      # AzureAd__TenantId: "${AZURE_AD_TENANT_ID}"
+      # AzureAd__ClientId: "${AZURE_AD_CLIENT_ID}"
+      # AzureAd__Audience: "${AZURE_AD_AUDIENCE}"
+      # Azure__BlobStorage__ConnectionString: "${AZURE_BLOB_CONNECTION_STRING}"
+      # Azure__BlobStorage__ContainerName: "${AZURE_BLOB_CONTAINER_NAME}"
+      # Azure__KeyVault__Uri: "${AZURE_KEY_VAULT_URI}"
     ports:
       - "5000:8080"
     depends_on:

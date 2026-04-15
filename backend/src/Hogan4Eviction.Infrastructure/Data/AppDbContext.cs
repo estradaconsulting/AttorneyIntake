@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<EvictionCause> EvictionCauses => Set<EvictionCause>();
     public DbSet<NoticeRequest> NoticeRequests => Set<NoticeRequest>();
     public DbSet<CaseDocument> CaseDocuments => Set<CaseDocument>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();  // M-05
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -93,6 +94,19 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<CaseDocument>(e =>
         {
             e.Property(x => x.DocumentType).HasConversion<string>();
+        });
+
+        // ── AuditLog (M-05) ───────────────────────────────────────────────
+        modelBuilder.Entity<AuditLog>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Actor).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Action).HasMaxLength(50).IsRequired();
+            e.Property(x => x.ResourceType).HasMaxLength(100).IsRequired();
+            e.Property(x => x.ResourceId).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Detail).HasMaxLength(1000);
+            e.HasIndex(x => x.OccurredAt);   // for time-range queries
+            e.HasIndex(x => x.Actor);
         });
     }
 }

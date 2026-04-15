@@ -14,6 +14,8 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    // M-01: Source maps disabled in production — they expose full TypeScript source.
+    // Set VITE_SOURCEMAP=true in .env.local during development if needed for debugging.
+    sourcemap: process.env.VITE_SOURCEMAP === 'true' ? true : false,
   }
 })
