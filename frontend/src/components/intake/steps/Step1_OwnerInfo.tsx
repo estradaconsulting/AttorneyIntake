@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { OwnerType, OwnerTypeLabels, type Step1_OwnerData } from '../../../types/intake'
 import { FormField, Input } from '../../common/FormField'
+import { validatePhone } from '../../../utils/validation'
 
 interface Props {
   defaultValues?: Step1_OwnerData
@@ -86,20 +87,35 @@ export default function Step1_OwnerInfo({ defaultValues, onNext }: Props) {
           <Input {...register('address')} placeholder="Street, City, State, Zip" />
         </FormField>
 
-        <FormField label="Telephone #">
-          <Input {...register('phone')} type="tel" placeholder="(916) 000-0000" />
+        <FormField label="Telephone #" error={errors.phone?.message}>
+          <Input
+            {...register('phone', { validate: validatePhone })}
+            type="tel"
+            placeholder="(916) 000-0000"
+            error={!!errors.phone}
+          />
         </FormField>
 
-        <FormField label="Alternate Phone #">
-          <Input {...register('alternatePhone')} type="tel" placeholder="Optional alternate number" />
+        <FormField label="Alternate Phone #" error={errors.alternatePhone?.message}>
+          <Input
+            {...register('alternatePhone', { validate: validatePhone })}
+            type="tel"
+            placeholder="Optional alternate number"
+            error={!!errors.alternatePhone}
+          />
         </FormField>
 
         <FormField label="Email Address">
           <Input {...register('email')} type="email" placeholder="you@example.com" />
         </FormField>
 
-        <FormField label="Fax #">
-          <Input {...register('fax')} type="tel" placeholder="Optional fax number" />
+        <FormField label="Fax #" error={errors.fax?.message}>
+          <Input
+            {...register('fax', { validate: validatePhone })}
+            type="tel"
+            placeholder="Optional fax number"
+            error={!!errors.fax}
+          />
         </FormField>
       </div>
 

@@ -1,6 +1,7 @@
 import { useForm } from 'react-hook-form'
 import type { PaymentAuthorizationData } from '../../../types/intake'
 import { FormField, Input, Textarea, Checkbox, Radio } from '../../common/FormField'
+import { validatePhone } from '../../../utils/validation'
 
 interface Props {
   defaultValues?: PaymentAuthorizationData
@@ -52,8 +53,13 @@ export default function Step7_PaymentAuthorization({ defaultValues, onNext, onBa
           />
         </FormField>
 
-        <FormField label="Best Billing Phone #">
-          <Input {...register('billingPhone')} type="tel" placeholder="(916) 000-0000" />
+        <FormField label="Best Billing Phone #" error={errors.billingPhone?.message}>
+          <Input
+            {...register('billingPhone', { validate: validatePhone })}
+            type="tel"
+            placeholder="(916) 000-0000"
+            error={!!errors.billingPhone}
+          />
         </FormField>
 
         <FormField label="Billing Zip Code">

@@ -1,6 +1,7 @@
 import { useForm } from 'react-hook-form'
 import type { Step2_ManagerData } from '../../../types/intake'
 import { FormField, Input, Checkbox } from '../../common/FormField'
+import { validatePhone } from '../../../utils/validation'
 
 interface Props {
   defaultValues?: Step2_ManagerData
@@ -9,7 +10,7 @@ interface Props {
 }
 
 export default function Step2_ManagerInfo({ defaultValues, onNext, onBack }: Props) {
-  const { register, handleSubmit, watch } = useForm<Step2_ManagerData>({
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<Step2_ManagerData>({
     defaultValues: defaultValues ?? { hasManager: false },
   })
 
@@ -28,28 +29,75 @@ export default function Step2_ManagerInfo({ defaultValues, onNext, onBack }: Pro
 
       {hasManager && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 border-l-4 border-blue-100 pl-4">
-          <FormField label="Property Manager's Name" className="sm:col-span-2">
-            <Input {...register('name')} placeholder="Full name" />
+          <FormField
+            label="Property Manager's Name"
+            required
+            error={errors.name?.message}
+            className="sm:col-span-2"
+          >
+            <Input
+              {...register('name', { required: 'Manager name is required' })}
+              placeholder="Full name"
+              error={!!errors.name}
+            />
           </FormField>
 
-          <FormField label="Management Company">
-            <Input {...register('company')} placeholder="Company name" />
+          <FormField
+            label="Management Company"
+            required
+            error={errors.company?.message}
+          >
+            <Input
+              {...register('company', { required: 'Company name is required' })}
+              placeholder="Company name"
+              error={!!errors.company}
+            />
           </FormField>
 
-          <FormField label="Manager's Phone #">
-            <Input {...register('phone')} type="tel" placeholder="(916) 000-0000" />
+          <FormField
+            label="Manager's Phone #"
+            required
+            error={errors.phone?.message}
+          >
+            <Input
+              {...register('phone', {
+                required: 'Phone number is required',
+                validate: validatePhone,
+              })}
+              type="tel"
+              placeholder="(916) 000-0000"
+              error={!!errors.phone}
+            />
           </FormField>
 
           <FormField label="Manager's Address" className="sm:col-span-2">
             <Input {...register('address')} placeholder="Street, City, State, Zip" />
           </FormField>
 
-          <FormField label="Manager's Email" className="sm:col-span-2">
-            <Input {...register('email')} type="email" placeholder="manager@example.com" />
+          <FormField
+            label="Manager's Email"
+            required
+            error={errors.email?.message}
+            className="sm:col-span-2"
+          >
+            <Input
+              {...register('email', {
+                required: 'Email address is required',
+                pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email address' },
+              })}
+              type="email"
+              placeholder="manager@example.com"
+              error={!!errors.email}
+            />
           </FormField>
 
-          <FormField label="Manager's Fax" className="sm:col-span-2">
-            <Input {...register('fax')} type="tel" placeholder="Optional fax number" />
+          <FormField label="Manager's Fax" error={errors.fax?.message} className="sm:col-span-2">
+            <Input
+              {...register('fax', { validate: validatePhone })}
+              type="tel"
+              placeholder="Optional fax number"
+              error={!!errors.fax}
+            />
           </FormField>
         </div>
       )}

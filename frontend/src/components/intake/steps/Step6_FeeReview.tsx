@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PropertyLocation, type FeeCalculationResult, type FeeLineItem, type IntakeWizardState } from '../../../types/intake'
+import { PropertyLocation, PropertyLocationLabels, type FeeCalculationResult, type FeeLineItem, type IntakeWizardState } from '../../../types/intake'
 import { calculateFee } from '../../../services/api'
 
 interface Props {
@@ -142,10 +142,31 @@ function calculateFeeOffline(req: FeeRequest): FeeCalculationResult {
   }
 }
 
+/** Human-readable county name for a location. */
+function countyOf(loc: PropertyLocation): string {
+  switch (loc) {
+    case PropertyLocation.Sacramento:
+    case PropertyLocation.ElkGroveRosevileFolsom:
+      return 'Sacramento County'
+    case PropertyLocation.Loomis:
+    case PropertyLocation.Placer:
+      return 'Placer County'
+    case PropertyLocation.YoloDavis:
+    case PropertyLocation.Woodland:
+    case PropertyLocation.WestSacramento:
+      return 'Yolo County'
+    case PropertyLocation.AuburnElDoradoGalt:
+      return 'El Dorado / Placer County'
+    default:
+      return 'Sacramento County'
+  }
+}
+
 export default function Step6_FeeReview({ wizardState, onNext, onBack }: Props) {
   const [fees, setFees] = useState<FeeCalculationResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [isOffline, setIsOffline] = useState(false)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
 
   const prop = wizardState.step3
   const noticeStep = wizardState.step5
@@ -179,6 +200,9 @@ export default function Step6_FeeReview({ wizardState, onNext, onBack }: Props) 
 
   const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
+  const locationLabel = prop ? PropertyLocationLabels[prop.location] : null
+  const countyLabel  = prop ? countyOf(prop.location) : null
+
   return (
     <div className="space-y-6">
       <div className="alert-info">
@@ -189,16 +213,37 @@ export default function Step6_FeeReview({ wizardState, onNext, onBack }: Props) 
         </p>
       </div>
 
+      {/* Jurisdiction badge — confirms which location/county the fees are based on */}
+      {locationLabel && (
+        <div className="flex items-start gap-3 rounded border border-[#1e3a5f] bg-[#eef2f7] px-4 py-3">
+          <span className="mt-0.5 text-[#1e3a5f]">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </span>
+          <div className="text-sm">
+            <span className="font-semibold text-[#1e3a5f]">Jurisdiction: </span>
+            <span className="font-medium text-gray-800">{locationLabel}</span>
+            <span className="mx-2 text-gray-400">·</span>
+            <span className="font-semibold text-[#8b1414]">{countyLabel}</span>
+            <p className="mt-0.5 text-xs text-gray-500">
+              Fees below are calculated for this jurisdiction. If this is incorrect, go back to Step 3 and update the property location.
+            </p>
+          </div>
+        </div>
+      )}
+
       {loading && (
         <div className="py-8 text-center text-gray-500">
-          <div className="mb-2 text-3xl">Fee Calculator</div>
+          <div className="mb-2 text-3xl">⚖️</div>
           Calculating fees...
         </div>
       )}
 
       {!loading && isOffline && (
         <div className="alert-warning text-xs">
-          Fee estimate calculated locally. Totals will be confirmed by the office before filing.
+          Fee estimate calculated locally using the 2025 price list. Totals will be confirmed by the office before filing.
         </div>
       )}
 
@@ -210,7 +255,7 @@ export default function Step6_FeeReview({ wizardState, onNext, onBack }: Props) 
                 <tr className="bg-[#1e2840] text-left text-white">
                   <th className="px-4 py-3 font-semibold">Service</th>
                   <th className="px-4 py-3 text-right font-semibold">Fee</th>
-                  <th className="w-20 px-4 py-3 text-center font-semibold">Required</th>
+                  <th className="w-24 px-4 py-3 text-center font-semibold">Required</th>
                 </tr>
               </thead>
               <tbody>
@@ -218,7 +263,7 @@ export default function Step6_FeeReview({ wizardState, onNext, onBack }: Props) 
                   <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#f5f7f4]'}>
                     <td className="px-4 py-2.5 text-gray-800">{item.description}</td>
                     <td className="px-4 py-2.5 text-right font-mono font-medium">
-                      {item.amount > 0 ? fmt(item.amount) : '-'}
+                      {item.amount > 0 ? fmt(item.amount) : '—'}
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       {item.isRequired
@@ -243,12 +288,169 @@ export default function Step6_FeeReview({ wizardState, onNext, onBack }: Props) 
           </div>
 
           <div className="alert-warning text-xs">
-            <strong>Additional Possible Charges:</strong> Hearings or trial $350, default money judgment $350,
-            reposting writ $300, witness subpoena preparation and service $400 plus witness fees,
-            and hourly attorney rates of $300 per hour may apply in contested actions.
+            <strong>Additional Possible Charges:</strong> Hearings or trial $350 · default money judgment $350 ·
+            reposting writ $300 · witness subpoena preparation and service $400 plus witness fees ·
+            hourly attorney rate $300/hr in contested actions.
           </div>
         </>
       )}
+
+      {/* ── 2025 Complete Fee Schedule (collapsible) ───────────────────────────── */}
+      <div className="rounded border border-gray-300 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setScheduleOpen(o => !o)}
+          className="flex w-full items-center justify-between bg-[#f5f7f4] px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f] hover:bg-[#e8ede6] transition-colors"
+        >
+          <span>📋 View Complete 2025 Fee Schedule (All Jurisdictions)</span>
+          <span className="text-lg leading-none">{scheduleOpen ? '▲' : '▼'}</span>
+        </button>
+
+        {scheduleOpen && (
+          <div className="p-4 space-y-5 text-xs">
+
+            {/* Uncontested Eviction */}
+            <div>
+              <h4 className="font-bold text-[#1e3a5f] mb-2 text-sm">Uncontested Eviction — Attorney Fees</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[#1e2840] text-white">
+                      <th className="px-3 py-2 text-left font-semibold">Jurisdiction</th>
+                      <th className="px-3 py-2 text-center font-semibold">County</th>
+                      <th className="px-3 py-2 text-right font-semibold">Claim &lt; $10k</th>
+                      <th className="px-3 py-2 text-right font-semibold">Claim $10k–$35k</th>
+                      <th className="px-3 py-2 text-right font-semibold">Claim &gt; $35k</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { loc: PropertyLocation.Sacramento,            county: 'Sacramento', lt10: 995,   mid: 1350, gt35: '—'   },
+                      { loc: PropertyLocation.ElkGroveRosevileFolsom, county: 'Sacramento', lt10: 1100, mid: 1900, gt35: '—'   },
+                      { loc: PropertyLocation.Loomis,                county: 'Placer',     lt10: 1250, mid: 1900, gt35: 2500   },
+                      { loc: PropertyLocation.YoloDavis,             county: 'Yolo',       lt10: 1100, mid: 1900, gt35: 2500   },
+                      { loc: PropertyLocation.AuburnElDoradoGalt,    county: 'El Dorado / Placer', lt10: 1350, mid: 1900, gt35: 2500 },
+                      { loc: PropertyLocation.Woodland,              county: 'Yolo',       lt10: 1100, mid: 1900, gt35: 2500   },
+                      { loc: PropertyLocation.Placer,                county: 'Placer',     lt10: 1250, mid: 1900, gt35: 2500   },
+                      { loc: PropertyLocation.WestSacramento,        county: 'Yolo',       lt10: 1100, mid: 1900, gt35: 2500   },
+                    ].map((row, i) => (
+                      <tr
+                        key={row.loc}
+                        className={[
+                          i % 2 === 0 ? 'bg-white' : 'bg-[#f5f7f4]',
+                          prop?.location === row.loc ? 'ring-2 ring-inset ring-[#8b1414]' : '',
+                        ].join(' ')}
+                      >
+                        <td className="px-3 py-2 font-medium text-gray-800">
+                          {PropertyLocationLabels[row.loc]}
+                          {prop?.location === row.loc && (
+                            <span className="ml-2 rounded bg-[#8b1414] px-1.5 py-0.5 text-[10px] font-bold text-white">YOUR CASE</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center text-gray-600">{row.county}</td>
+                        <td className="px-3 py-2 text-right font-mono">{typeof row.lt10 === 'number' ? fmt(row.lt10) : row.lt10}</td>
+                        <td className="px-3 py-2 text-right font-mono">{typeof row.mid === 'number' ? fmt(row.mid) : row.mid}</td>
+                        <td className="px-3 py-2 text-right font-mono">{typeof row.gt35 === 'number' ? fmt(row.gt35) : row.gt35}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Commercial Eviction */}
+            <div>
+              <h4 className="font-bold text-[#1e3a5f] mb-2 text-sm">Commercial Eviction — Attorney Fees</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[#1e2840] text-white">
+                      <th className="px-3 py-2 text-left font-semibold">Jurisdiction</th>
+                      <th className="px-3 py-2 text-right font-semibold">Base Fee</th>
+                      <th className="px-3 py-2 text-right font-semibold">+ Claim $10k–$25k</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { label: 'Sacramento City / County',            fee: 1350 },
+                      { label: 'All Other Jurisdictions',             fee: 1500 },
+                    ].map((row, i) => (
+                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#f5f7f4]'}>
+                        <td className="px-3 py-2 font-medium text-gray-800">{row.label}</td>
+                        <td className="px-3 py-2 text-right font-mono">{fmt(row.fee)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-gray-500">+ $250.00</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Notice Preparation */}
+            <div>
+              <h4 className="font-bold text-[#1e3a5f] mb-2 text-sm">Notice Preparation &amp; Service</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[#1e2840] text-white">
+                      <th className="px-3 py-2 text-left font-semibold">Jurisdiction</th>
+                      <th className="px-3 py-2 text-right font-semibold">Residential</th>
+                      <th className="px-3 py-2 text-right font-semibold">Commercial / Foreclosure</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { label: 'Sacramento City / County',       res: 175, comm: 200 },
+                      { label: 'Elk Grove / Roseville / Folsom', res: 200, comm: 300 },
+                      { label: 'All Other Jurisdictions',        res: 250, comm: 300 },
+                    ].map((row, i) => (
+                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#f5f7f4]'}>
+                        <td className="px-3 py-2 font-medium text-gray-800">{row.label}</td>
+                        <td className="px-3 py-2 text-right font-mono">{fmt(row.res)}</td>
+                        <td className="px-3 py-2 text-right font-mono">{fmt(row.comm)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Add-ons & Flat Fees */}
+            <div>
+              <h4 className="font-bold text-[#1e3a5f] mb-2 text-sm">Add-Ons &amp; Flat Fees</h4>
+              <table className="w-full border-collapse text-xs">
+                <tbody>
+                  {[
+                    ['Court Appearance Add-On (Yolo / Auburn / El Dorado)', '$45.00', 'Added to all cases in these counties'],
+                    ['Additional Defendants — Sacramento', '$35.00 each', 'Per defendant beyond the first'],
+                    ['Additional Defendants — Woodland', '$55.00 each', 'Per defendant beyond the first'],
+                    ['Additional Defendants — All Other', '$45.00 each', 'Per defendant beyond the first'],
+                    ['Foreclosure Case Add-On', '$300.00', 'Applied to all foreclosure matters'],
+                    ['Consultation (up to ½ hour)', '$150.00', 'If applicable'],
+                    ['Consultation (1 hour)', '$300.00', 'If applicable'],
+                    ['Contested Hearing / Trial', '$350.00', 'If applicable'],
+                    ['Default Money Judgment (incl. stip. defaults)', '$350.00', 'If applicable'],
+                    ['Reposting Writ', '$300.00', 'If applicable'],
+                    ['Witness Subpoena Prep &amp; Service', '$400.00 + witness fees', 'If applicable'],
+                    ['Hourly Attorney Rate (contested actions)', '$300.00 / hr', 'If applicable'],
+                  ].map(([service, fee, note], i) => (
+                    <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#f5f7f4]'}>
+                      <td className="px-3 py-2 font-medium text-gray-800" dangerouslySetInnerHTML={{ __html: service }} />
+                      <td className="px-3 py-2 text-right font-mono text-gray-800 whitespace-nowrap">{fee}</td>
+                      <td className="px-3 py-2 text-gray-500">{note}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="text-gray-500 italic">
+              2025 Price List — Law Office of Thomas M. Hogan. Fees are required in advance of filing unless otherwise agreed.
+              Court filing fees, process server fees, and other third-party costs are separate and not included above.
+            </p>
+          </div>
+        )}
+      </div>
 
       <div className="flex justify-between pt-4">
         <button type="button" onClick={onBack} className="btn-secondary">Back</button>

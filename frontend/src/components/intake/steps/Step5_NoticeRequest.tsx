@@ -5,6 +5,7 @@ import {
   type Step3_PropertyData,
 } from '../../../types/intake'
 import { FormField, Input, Select, Textarea, Checkbox, Radio } from '../../common/FormField'
+import { validatePhone } from '../../../utils/validation'
 
 interface Props {
   defaultValues?: Step5_NoticeRequestData
@@ -14,7 +15,7 @@ interface Props {
 }
 
 export default function Step5_NoticeRequest({ defaultValues, onNext, onBack }: Props) {
-  const { register, handleSubmit, watch } = useForm<Step5_NoticeRequestData>({
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<Step5_NoticeRequestData>({
     defaultValues: defaultValues ?? {
       wantsNoticePrep: false,
       isResidential: true,
@@ -57,7 +58,37 @@ export default function Step5_NoticeRequest({ defaultValues, onNext, onBack }: P
       {wantsNoticePrep && (
         <div className="space-y-5 border-l-4 border-[#8b1414] pl-5">
 
-          {/* Owner info */}
+          {/* Owner contact for notice form (page 6) */}
+          <div>
+            <h3 className="section-title text-sm">Owner Contact (for Notice)</h3>
+            <p className="text-xs text-gray-500 mb-3">
+              The address and phone below appear on the notice delivered to your tenant.
+              Leave blank to use the information from Step 1.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField label="Billing Address" hint="To include City/State/Zip" className="sm:col-span-2">
+                <Input {...register('ownerBillingAddress')} placeholder="Street, City, State, Zip (if different from owner address)" />
+              </FormField>
+              <FormField label="Alternative Phone #" error={errors.ownerAlternativePhone?.message}>
+                <Input
+                  {...register('ownerAlternativePhone', { validate: validatePhone })}
+                  type="tel"
+                  placeholder="Optional"
+                  error={!!errors.ownerAlternativePhone}
+                />
+              </FormField>
+              <FormField label="Fax #" error={errors.ownerFax?.message}>
+                <Input
+                  {...register('ownerFax', { validate: validatePhone })}
+                  type="tel"
+                  placeholder="Optional"
+                  error={!!errors.ownerFax}
+                />
+              </FormField>
+            </div>
+          </div>
+
+          {/* Property type */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Property Type">
               <div className="flex gap-4 mt-1">
@@ -132,8 +163,13 @@ export default function Step5_NoticeRequest({ defaultValues, onNext, onBack }: P
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Phone # for Tenant to Reach You">
-              <Input {...register('tenantContactPhone')} type="tel" />
+            <FormField label="Phone # for Tenant to Reach You" error={errors.tenantContactPhone?.message}>
+              <Input
+                {...register('tenantContactPhone', { validate: validatePhone })}
+                type="tel"
+                placeholder="(916) 000-0000"
+                error={!!errors.tenantContactPhone}
+              />
             </FormField>
             <FormField label="Usual Days & Hours for Payment Delivery">
               <Input {...register('usualPaymentDaysHours')} placeholder="e.g. Mon–Fri 9am–5pm" />

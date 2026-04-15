@@ -96,45 +96,61 @@ export default function Step4_EvictionCause({ defaultValues, onNext, onBack }: P
         )}
       </div>
 
-      {/* Rental assistance disclosures (UD-101 / UD-120) */}
+      {/* Rental assistance disclosures (UD-101 Q12 / UD-120) */}
       <div>
-        <h3 className="section-title">Rental Assistance Statements (Required)</h3>
-        <p className="text-xs text-gray-500 mb-3">
-          Required for all cases based on non-payment of rent (UD-101 / UD-120 compliance).
+        <h3 className="section-title">Rental Assistance Statements (UD-101 Q12)</h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Required for all cases based on non-payment of rent. Answer each question as it
+          will appear on the mandatory court cover sheet (UD-101).
         </p>
-        <div className="space-y-3">
-          <Checkbox
-            label="I have NOT received rental assistance corresponding to the amount demanded in the notice"
-            {...register('receivedRentalAssistanceForNoticeAmount')}
-          />
-          <Checkbox
-            label="I have NOT received rental assistance for rent accruing after the notice date"
-            {...register('receivedRentalAssistanceAfterNoticeDate')}
-          />
-          <Checkbox
-            label="I do NOT have a pending application for rental assistance for the notice amount"
-            {...register('pendingApplicationForNoticeAmount')}
-          />
-          <Checkbox
-            label="I do NOT have a pending application for rental assistance for rent after the notice date"
-            {...register('pendingApplicationAfterNoticeDate')}
-          />
-        </div>
-        <div className="mt-4 border-l-4 border-[#d4ddd0] pl-4">
+
+        {/* Helper to render a single Yes/No question matching UD-101 format */}
+        {([
+          {
+            field: 'receivedRentalAssistanceForNoticeAmount' as const,
+            question: 'a. Has plaintiff received rental assistance or other financial compensation corresponding to the amount demanded in the notice?',
+          },
+          {
+            field: 'receivedRentalAssistanceAfterNoticeDate' as const,
+            question: 'b. Has plaintiff received rental assistance or other financial compensation for rent accruing after the date of the notice?',
+          },
+          {
+            field: 'pendingApplicationForNoticeAmount' as const,
+            question: 'c. Does plaintiff have any pending application for rental assistance corresponding to the amount demanded in the notice?',
+          },
+          {
+            field: 'pendingApplicationAfterNoticeDate' as const,
+            question: 'd. Does plaintiff have any pending application for rental assistance for rent accruing after the date of the notice?',
+          },
+        ] as const).map(({ field, question }) => (
+          <div key={field} className="mb-4 rounded border border-gray-200 bg-gray-50 p-3">
+            <p className="text-sm text-gray-700 mb-2">{question}</p>
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <input type="radio" value="true"
+                  {...register(field, { setValueAs: (v: string) => v === 'true' })}
+                  className="text-[#8b1414]" />
+                <span className="text-red-700 font-medium">Yes</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <input type="radio" value="false"
+                  {...register(field, { setValueAs: (v: string) => v === 'true' })}
+                  className="text-[#1e3a5f]" />
+                <span className="text-green-700 font-medium">No</span>
+              </label>
+            </div>
+          </div>
+        ))}
+
+        <div className="mt-2 border-l-4 border-[#d4ddd0] pl-4">
           <p className="text-sm font-medium text-gray-700 mb-2">
-            Who will sign the rental assistance verification form?
+            Who will sign the rental assistance verification (UD-120)?
           </p>
           <div className="flex flex-wrap gap-4">
-            <Radio
-              label="Property Owner"
-              value="owner"
-              {...register('rentalAssistanceDeclarantRole', { required: true })}
-            />
-            <Radio
-              label="Property Manager"
-              value="manager"
-              {...register('rentalAssistanceDeclarantRole', { required: true })}
-            />
+            <Radio label="Property Owner" value="owner"
+              {...register('rentalAssistanceDeclarantRole')} />
+            <Radio label="Property Manager" value="manager"
+              {...register('rentalAssistanceDeclarantRole')} />
           </div>
         </div>
       </div>

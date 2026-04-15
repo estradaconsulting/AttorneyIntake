@@ -192,6 +192,10 @@ export interface Step5_NoticeRequestData {
   otherNoticeSpecification?: string
   isResidential: boolean
   isCommercial: boolean
+  // Owner contact on notice form (page 6) — may differ from Step 1 address
+  ownerBillingAddress?: string  // "Billing Address" field on page 6 — separate from home address
+  ownerAlternativePhone?: string
+  ownerFax?: string
   tenantPropertyAddress?: string
   monthlyRent?: number
   currentBalanceDue?: number
