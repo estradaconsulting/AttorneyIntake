@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Hogan4Eviction.Infrastructure.Data;
 
 namespace Hogan4Eviction.API.Controllers;
 
@@ -20,6 +21,7 @@ public class IntakeCasesController : ControllerBase
     private readonly IAuditService _audit;
     private readonly ILogger<IntakeCasesController> _logger;
     private readonly IWebHostEnvironment _environment;
+    private readonly AppDbContext _db;
 
     // C-03: Strict allowlist for client-supplied reference numbers used in path building
     private static readonly Regex SafeRefNumRegex =
@@ -29,12 +31,14 @@ public class IntakeCasesController : ControllerBase
         IIntakeCaseRepository repo,
         IAuditService audit,
         ILogger<IntakeCasesController> logger,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        AppDbContext db)
     {
         _repo        = repo;
         _audit       = audit;
         _logger      = logger;
         _environment = environment;
+        _db          = db;
     }
 
     // ── Staff endpoints ───────────────────────────────────────────────────────
@@ -57,7 +61,8 @@ public class IntakeCasesController : ControllerBase
         var c = await _repo.GetByIdAsync(id, ct);
         if (c is null) return NotFound();
         await _audit.LogAsync(User.Identity?.Name ?? "unknown", "READ", "IntakeCase", id.ToString(), $"Viewed case {c.ReferenceNumber}", ct);
-        return Ok(MapToDetail(c));
+        var activity = await GetCaseActivityAsync(c, ct);
+        return Ok(MapToDetail(c, activity));
     }
 
     /// <summary>Look up a case by reference number (staff only).</summary>
@@ -83,6 +88,39 @@ public class IntakeCasesController : ControllerBase
         c.Status = newStatus;
         await _repo.UpdateAsync(c, ct);
         await _audit.LogAsync(User.Identity?.Name ?? "unknown", "UPDATE_STATUS", "IntakeCase", id.ToString(), $"{previous} -> {newStatus}", ct);
+        return NoContent();
+    }
+
+    /// <summary>Update internal staff matter fields such as file number and notes.</summary>
+    [HttpPatch("{id:int}/staff")]
+    [EnableRateLimiting("WritesAndUploads")]
+    public async Task<ActionResult> UpdateStaffFields(int id, [FromBody] UpdateIntakeCaseStaffRequest request, CancellationToken ct)
+    {
+        var c = await _repo.GetByIdAsync(id, ct);
+        if (c is null) return NotFound();
+
+        var oldFileNumber = c.OurFileNumber;
+        var oldNotes = c.StaffNotes;
+
+        c.OurFileNumber = string.IsNullOrWhiteSpace(request.OurFileNumber) ? null : request.OurFileNumber.Trim();
+        c.StaffNotes = string.IsNullOrWhiteSpace(request.StaffNotes) ? null : request.StaffNotes.Trim();
+
+        await _repo.UpdateAsync(c, ct);
+
+        var changes = new List<string>();
+        if (!string.Equals(oldFileNumber, c.OurFileNumber, StringComparison.Ordinal))
+            changes.Add($"File #: {(string.IsNullOrWhiteSpace(oldFileNumber) ? "blank" : oldFileNumber)} -> {(string.IsNullOrWhiteSpace(c.OurFileNumber) ? "blank" : c.OurFileNumber)}");
+        if (!string.Equals(oldNotes, c.StaffNotes, StringComparison.Ordinal))
+            changes.Add("Staff notes updated");
+
+        await _audit.LogAsync(
+            User.Identity?.Name ?? "unknown",
+            "UPDATE_STAFF",
+            "IntakeCase",
+            id.ToString(),
+            changes.Count > 0 ? string.Join("; ", changes) : "Staff fields saved",
+            ct);
+
         return NoContent();
     }
 
@@ -267,19 +305,40 @@ public class IntakeCasesController : ControllerBase
     );
 
     // H-01: Staff detail DTO includes tenant PII but is only returned to authenticated staff
-    private static IntakeCaseDetailDto MapToDetail(IntakeCase c) => new(
+    private static IntakeCaseDetailDto MapToDetail(IntakeCase c, IReadOnlyList<IntakeCaseActivityDto> activity) => new(
         c.Id,
         c.ReferenceNumber,
         c.Status,
         c.CreatedAt,
         c.SubmittedAt,
+        c.OurFileNumber,
+        c.StaffNotes,
         c.PropertyOwner,
         c.PropertyManager,
         c.Property,
         c.EvictionCause,
         c.NoticeRequest,
-        c.Documents.ToList()
+        c.Documents.ToList(),
+        activity
     );
+
+    private async Task<IReadOnlyList<IntakeCaseActivityDto>> GetCaseActivityAsync(IntakeCase c, CancellationToken ct)
+    {
+        var resourceIds = new[] { c.Id.ToString(), c.ReferenceNumber };
+
+        return await _db.AuditLogs
+            .Where(log => log.ResourceType == "IntakeCase" && resourceIds.Contains(log.ResourceId))
+            .OrderByDescending(log => log.OccurredAt)
+            .Take(25)
+            .Select(log => new IntakeCaseActivityDto(
+                log.Id,
+                log.Actor,
+                log.Action,
+                log.ResourceId,
+                log.Detail,
+                log.OccurredAt))
+            .ToListAsync(ct);
+    }
 
     private static PropertyOwner MapOwner(PropertyOwnerDto d) => new()
     {

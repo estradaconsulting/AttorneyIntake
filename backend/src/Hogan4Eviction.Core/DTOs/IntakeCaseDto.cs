@@ -140,12 +140,24 @@ public record IntakeCaseDetailDto(
     CaseStatus Status,
     DateTime CreatedAt,
     DateTime? SubmittedAt,
+    string? OurFileNumber,
+    string? StaffNotes,
     PropertyOwner? PropertyOwner,
     PropertyManager? PropertyManager,
     Property? Property,
     EvictionCause? EvictionCause,
     NoticeRequest? NoticeRequest,
-    IReadOnlyList<CaseDocument> Documents
+    IReadOnlyList<CaseDocument> Documents,
+    IReadOnlyList<IntakeCaseActivityDto> Activity
+);
+
+public record IntakeCaseActivityDto(
+    long Id,
+    string Actor,
+    string Action,
+    string ResourceId,
+    string? Detail,
+    DateTime OccurredAt
 );
 
 public record IntakeCaseCreatedDto(
@@ -153,4 +165,9 @@ public record IntakeCaseCreatedDto(
     string ReferenceNumber,
     CaseStatus Status,
     string Message
+);
+
+public record UpdateIntakeCaseStaffRequest(
+    [MaxLength(50)] string? OurFileNumber,
+    [MaxLength(5000)] string? StaffNotes
 );

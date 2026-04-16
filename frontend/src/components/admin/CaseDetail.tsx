@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import { getAdminCase, updateCaseStatus } from '../../services/adminApi'
+import { getAdminCase, updateCaseStaffFields, updateCaseStatus } from '../../services/adminApi'
 import type { AdminCaseDetail, CaseDocumentModel } from '../../types/admin'
 import { CaseStatus, NoticeTypeLabels, OwnerTypeLabels, PropertyLocationLabels, DocumentTypeLabels } from '../../types/intake'
 import StatusBadge, { STATUS_CONFIG } from './StatusBadge'
@@ -12,6 +12,17 @@ GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 function fmt(dateStr: string | null | undefined) {
   if (!dateStr) return '--'
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
+function fmtDateTime(dateStr: string | null | undefined) {
+  if (!dateStr) return '--'
+  return new Date(dateStr).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 function fmtMoney(val: number | undefined | null) {
@@ -68,6 +79,10 @@ export default function CaseDetail() {
   const [previewDoc, setPreviewDoc] = useState<CaseDocumentModel | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [staffSaving, setStaffSaving] = useState(false)
+  const [staffSuccess, setStaffSuccess] = useState(false)
+  const [ourFileNumber, setOurFileNumber] = useState('')
+  const [staffNotes, setStaffNotes] = useState('')
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
@@ -76,6 +91,8 @@ export default function CaseDetail() {
       .then(data => {
         setCaseData(data)
         setSelectedStatus(data.status)
+        setOurFileNumber(data.ourFileNumber ?? '')
+        setStaffNotes(data.staffNotes ?? '')
       })
       .catch(() => setError('Could not load this case. It may not exist or the API is unavailable.'))
       .finally(() => setLoading(false))
@@ -93,6 +110,29 @@ export default function CaseDetail() {
       setError('Failed to update status. Please try again.')
     } finally {
       setStatusUpdating(false)
+    }
+  }
+
+  const handleStaffSave = async () => {
+    if (!caseData) return
+
+    setStaffSaving(true)
+    try {
+      await updateCaseStaffFields(caseData.id, {
+        ourFileNumber: ourFileNumber.trim() || null,
+        staffNotes: staffNotes.trim() || null,
+      })
+
+      const refreshed = await getAdminCase(caseData.id)
+      setCaseData(refreshed)
+      setOurFileNumber(refreshed.ourFileNumber ?? '')
+      setStaffNotes(refreshed.staffNotes ?? '')
+      setStaffSuccess(true)
+      setTimeout(() => setStaffSuccess(false), 3000)
+    } catch {
+      setError('Failed to save staff fields. Please try again.')
+    } finally {
+      setStaffSaving(false)
     }
   }
 
@@ -229,6 +269,63 @@ export default function CaseDetail() {
               {statusSuccess && <span className="text-xs font-medium text-green-600">Saved</span>}
             </div>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+          <SectionCard title="Matter Overview">
+            <div className="grid grid-cols-1 gap-x-6 md:grid-cols-2">
+              <div>
+                <Row label="Reference #" value={c.referenceNumber} />
+                <Row label="Our File #" value={c.ourFileNumber || '--'} />
+                <Row label="Current Status" value={<StatusBadge status={c.status} size="sm" />} />
+                <Row label="Created" value={fmtDateTime(c.createdAt)} />
+                <Row label="Submitted" value={fmtDateTime(c.submittedAt)} />
+              </div>
+              <div>
+                <Row label="Owner / Client" value={c.propertyOwner?.name ?? '--'} />
+                <Row label="Property" value={c.property?.address ?? '--'} />
+                <Row label="Tenant Count" value={c.property?.tenants?.length ?? 0} />
+                <Row label="Documents" value={c.documents?.length ?? 0} />
+                <Row label="Last Activity" value={fmtDateTime(c.activity?.[0]?.occurredAt)} />
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Internal Notes">
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Our File #</label>
+                <input
+                  type="text"
+                  value={ourFileNumber}
+                  onChange={event => setOurFileNumber(event.target.value)}
+                  placeholder="Ex: UD-2026-00449"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Staff Notes / Matter Log</label>
+                <textarea
+                  value={staffNotes}
+                  onChange={event => setStaffNotes(event.target.value)}
+                  rows={8}
+                  placeholder="Capture calls, strategy notes, missing docs, service issues, client follow-ups, and next steps..."
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleStaffSave}
+                  disabled={staffSaving}
+                  className="rounded-md bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#162d4a] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {staffSaving ? 'Saving...' : 'Save Notes'}
+                </button>
+                {staffSuccess && <span className="text-xs font-medium text-green-600">Saved</span>}
+              </div>
+            </div>
+          </SectionCard>
         </div>
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -398,6 +495,28 @@ export default function CaseDetail() {
                   </div>
                 )
               })}
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title={`Activity Timeline (${c.activity?.length ?? 0})`}>
+          {!c.activity || c.activity.length === 0 ? (
+            <p className="text-xs italic text-gray-400">No activity recorded yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {c.activity.map(item => (
+                <div key={item.id} className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-[#1e3a5f]">{item.action.split('_').join(' ')}</div>
+                    <div className="text-xs text-gray-500">{fmtDateTime(item.occurredAt)}</div>
+                  </div>
+                  <div className="mt-1 text-xs text-gray-600">
+                    <span className="font-medium text-gray-700">{item.actor}</span>
+                    {' · '}
+                    {item.detail || 'No detail provided.'}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </SectionCard>

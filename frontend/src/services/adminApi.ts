@@ -24,3 +24,10 @@ export async function updateCaseStatus(id: number, status: CaseStatus): Promise<
     headers: { 'Content-Type': 'application/json' },
   })
 }
+
+export async function updateCaseStaffFields(id: number, payload: {
+  ourFileNumber?: string | null
+  staffNotes?: string | null
+}): Promise<void> {
+  await api.patch(`/intakecases/${id}/staff`, payload)
+}

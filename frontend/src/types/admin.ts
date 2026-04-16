@@ -101,16 +101,28 @@ export interface CaseDocumentModel {
   uploadedAt: string
 }
 
+export interface CaseActivityModel {
+  id: number
+  actor: string
+  action: string
+  resourceId: string
+  detail?: string
+  occurredAt: string
+}
+
 export interface AdminCaseDetail {
   id: number
   referenceNumber: string
   status: CaseStatus
   createdAt: string
   submittedAt: string | null
+  ourFileNumber?: string | null
+  staffNotes?: string | null
   propertyOwner: PropertyOwnerModel | null
   propertyManager: PropertyManagerModel | null
   property: PropertyModel | null
   evictionCause: EvictionCauseModel | null
   noticeRequest: NoticeRequestModel | null
   documents: CaseDocumentModel[]
+  activity: CaseActivityModel[]
 }
