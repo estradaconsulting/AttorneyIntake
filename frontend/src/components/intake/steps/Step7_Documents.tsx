@@ -89,9 +89,9 @@ export default function Step7_Documents({ wizardState, onPrepared, onNext, onBac
     <div className="space-y-6">
       {prepared && refNum && (
         <div className="rounded border border-green-300 bg-green-50 p-4">
-          <div className="font-semibold text-green-800">Prepared for Local Save - Reference: {refNum}</div>
+          <div className="font-semibold text-green-800">Ready to Submit — Reference: {refNum}</div>
           <p className="mt-1 text-xs text-green-700">
-            Your intake details and selected documents will be saved locally when you click the final submit button.
+            Your intake details and documents are ready. Click the submit button on the next step to send your case to the office.
           </p>
         </div>
       )}

@@ -14,11 +14,15 @@ export default function Header() {
               <div className="text-xs text-gray-500">Law Office of Thomas M. Hogan</div>
             </div>
           </div>
-          <div className="hidden sm:flex items-center gap-4 text-xs text-gray-600">
-            <span className="font-semibold">(916) 929-2255</span>
+          <div className="flex items-center gap-4 text-xs text-gray-600">
+            <span className="hidden sm:inline font-semibold">(916) 929-2255</span>
             <a href="mailto:Hogan4eviction@outlook.com"
-               className="text-[#8b1414] hover:underline">
+               className="hidden sm:inline text-[#8b1414] hover:underline">
               Hogan4eviction@outlook.com
+            </a>
+            {/* Staff-only portal link — not prominently advertised to clients */}
+            <a href="/admin" className="text-gray-300 hover:text-gray-500 transition-colors text-xs">
+              Staff
             </a>
           </div>
         </div>
@@ -28,7 +32,7 @@ export default function Header() {
       <div className="bg-[#1e2840] px-4 py-5">
         <div className="mx-auto max-w-4xl">
           <h1 className="text-xl sm:text-2xl font-serif font-bold text-white">
-            2025 Client Intake Form
+            Client Intake Form
           </h1>
           <p className="mt-1 text-sm text-[#b8c4b0]">
             Complete all sections below to begin your eviction case. All required fields are marked with a red asterisk.

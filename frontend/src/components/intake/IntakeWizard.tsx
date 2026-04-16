@@ -38,7 +38,7 @@ export default function IntakeWizard() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-serif font-bold text-[#1e3a5f]">
-          2025 Client Intake Form
+          Client Intake Form
         </h1>
         <p className="mt-1 text-sm text-gray-600">
           Please complete all required fields. Your progress is saved as you advance through each step.
