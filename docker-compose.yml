@@ -1,23 +1,4 @@
 services:
-  db:
-    image: mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04
-    container_name: hogan_db
-    environment:
-      ACCEPT_EULA: "Y"
-      # H-02: No default password fallback — deployment FAILS loudly if not set.
-      # Generate a strong password and set it in .env (never commit .env to git).
-      SA_PASSWORD: "${DB_SA_PASSWORD:?DB_SA_PASSWORD must be set in .env — see .env.example}"
-      MSSQL_PID: Developer
-    ports:
-      - "1433:1433"
-    volumes:
-      - sqldata:/var/opt/mssql
-    healthcheck:
-      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD" -Q "SELECT 1" -C
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   api:
     build:
       context: ./backend
@@ -25,31 +6,21 @@ services:
     container_name: hogan_api
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      # H-07: Use a least-privilege app account, NOT sa.
-      # Create this account in SQL Server before production deployment (see README).
-      ConnectionStrings__DefaultConnection: >-
-        Server=db,1433;
-        Database=Hogan4EvictionDb;
-        User=${DB_APP_USER:?DB_APP_USER must be set};
-        Password=${DB_APP_PASSWORD:?DB_APP_PASSWORD must be set};
-        TrustServerCertificate=${DB_TRUST_CERT:-False}
+      # Database:Provider=InMemory — no SQL Server needed until launch
+      Database__Provider: "InMemory"
       Storage__Provider: "Local"
       Storage__LocalPath: "/app/uploads"
-      # Security flags — dev defaults are permissive; production overrides in .env
-      Security__SwaggerEnabled: "${SWAGGER_ENABLED:-false}"
-      Security__DevAuthEnabled: "${DEV_AUTH_ENABLED:-false}"
-      # Azure hooks — fill these in via .env when switching to Azure
+      # Dev auth + Swagger on by default in this compose file
+      Security__SwaggerEnabled: "true"
+      Security__DevAuthEnabled: "true"
+      # Azure hooks — uncomment and fill in .env when switching to Azure
       # AzureAd__TenantId: "${AZURE_AD_TENANT_ID}"
       # AzureAd__ClientId: "${AZURE_AD_CLIENT_ID}"
       # AzureAd__Audience: "${AZURE_AD_AUDIENCE}"
       # Azure__BlobStorage__ConnectionString: "${AZURE_BLOB_CONNECTION_STRING}"
       # Azure__BlobStorage__ContainerName: "${AZURE_BLOB_CONTAINER_NAME}"
-      # Azure__KeyVault__Uri: "${AZURE_KEY_VAULT_URI}"
     ports:
       - "5000:8080"
-    depends_on:
-      db:
-        condition: service_healthy
     volumes:
       - uploads:/app/uploads
 
@@ -66,5 +37,38 @@ services:
       - api
 
 volumes:
-  sqldata:
   uploads:
+
+# ── Production / SQL Server mode ─────────────────────────────────────────────
+# When ready to wire up the database for launch, restore the db service
+# and update the api environment block:
+#
+#   db:
+#     image: mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04
+#     environment:
+#       ACCEPT_EULA: "Y"
+#       SA_PASSWORD: "${DB_SA_PASSWORD:?DB_SA_PASSWORD must be set}"
+#       MSSQL_PID: Developer
+#     ports:
+#       - "1433:1433"
+#     volumes:
+#       - sqldata:/var/opt/mssql
+#     healthcheck:
+#       test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD" -Q "SELECT 1" -C
+#       interval: 10s
+#       timeout: 5s
+#       retries: 10
+#
+#   api environment additions:
+#     Database__Provider: "SqlServer"
+#     ConnectionStrings__DefaultConnection: >-
+#       Server=db,1433;Database=Hogan4EvictionDb;
+#       User=${DB_APP_USER};Password=${DB_APP_PASSWORD};
+#       TrustServerCertificate=False
+#     Security__DevAuthEnabled: "false"
+#
+#   api depends_on:
+#     db:
+#       condition: service_healthy
+#
+#   volumes: add sqldata:

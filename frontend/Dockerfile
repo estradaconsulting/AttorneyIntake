@@ -6,7 +6,10 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 COPY . .
-ARG VITE_API_URL=http://localhost:5000
+# Leave VITE_API_URL unset so the app defaults to relative /api paths.
+# nginx proxies /api/ → http://api:8080 internally, avoiding cross-origin calls entirely.
+# To point at an external API host, pass: --build-arg VITE_API_URL=https://api.example.com
+ARG VITE_API_URL=
 ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 

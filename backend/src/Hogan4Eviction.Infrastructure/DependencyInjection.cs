@@ -16,18 +16,25 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         // ── Database ──────────────────────────────────────────────────────
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(
-                configuration.GetConnectionString("DefaultConnection"),
-                sql => sql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)
-            ));
+        // Switch between InMemory (dev/no-DB mode) and SqlServer via Database:Provider config.
+        // Set "Database:Provider": "InMemory" in appsettings.Development.json to skip SQL Server entirely.
+        var dbProvider = configuration["Database:Provider"] ?? "SqlServer";
+        var useInMemory = dbProvider.Equals("InMemory", StringComparison.OrdinalIgnoreCase);
+
+        void ConfigureDb(DbContextOptionsBuilder options)
+        {
+            if (useInMemory)
+                options.UseInMemoryDatabase("Hogan4EvictionDb");
+            else
+                options.UseSqlServer(
+                    configuration.GetConnectionString("DefaultConnection"),
+                    sql => sql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName));
+        }
+
+        services.AddDbContext<AppDbContext>(ConfigureDb);
 
         // M-05: Factory needed by AuditLogService to get a fresh context per write
-        services.AddDbContextFactory<AppDbContext>(options =>
-            options.UseSqlServer(
-                configuration.GetConnectionString("DefaultConnection"),
-                sql => sql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)
-            ), ServiceLifetime.Scoped);
+        services.AddDbContextFactory<AppDbContext>(ConfigureDb, ServiceLifetime.Scoped);
 
         // ── Repositories ──────────────────────────────────────────────────
         services.AddScoped<IIntakeCaseRepository, IntakeCaseRepository>();
@@ -48,11 +55,19 @@ public static class DependencyInjection
         return services;
     }
 
-    /// <summary>Apply pending EF Core migrations on startup (dev/staging only).</summary>
+    /// <summary>
+    /// Apply pending EF Core migrations on startup (SqlServer only).
+    /// No-op for InMemory — the schema is created automatically.
+    /// </summary>
     public static void ApplyMigrations(this IServiceProvider serviceProvider)
     {
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        db.Database.Migrate();
+
+        // InMemory databases don't support Migrate() — EnsureCreated() is sufficient.
+        if (db.Database.IsInMemory())
+            db.Database.EnsureCreated();
+        else
+            db.Database.Migrate();
     }
 }

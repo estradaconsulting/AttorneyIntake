@@ -102,16 +102,19 @@ export default function Step8_Confirmation({ wizardState, onBack }: Props) {
   if (submitted) {
     return (
       <div className="text-center py-10 space-y-4">
-        <div className="text-5xl">Case saved</div>
+        <div className="text-5xl">✅</div>
         <h2 className="text-2xl font-serif font-bold text-[#1e3a5f]">
-          Intake Saved Successfully
+          Case Submitted Successfully
         </h2>
         <p className="text-lg font-semibold text-[#8b1414]">
           Reference Number: {wizardState.referenceNumber}
         </p>
         <p className="text-sm text-gray-600 max-w-md mx-auto">
-          Your intake package has been saved locally with the documents and certification details
-          needed for office review.
+          Your intake has been submitted to the Law Office of Thomas M. Hogan and will be
+          reviewed shortly. Please keep your reference number for your records.
+        </p>
+        <p className="text-xs text-gray-400 max-w-md mx-auto">
+          Questions? Call (916) 929-2255 or email Hogan4eviction@outlook.com
         </p>
       </div>
     )
@@ -283,7 +286,7 @@ export default function Step8_Confirmation({ wizardState, onBack }: Props) {
           disabled={submitting || !signed}
           className="btn-primary"
         >
-          {submitting ? 'Saving...' : 'Submit Case to Law Office'}
+          {submitting ? 'Submitting...' : 'Submit Case'}
         </button>
       </div>
     </div>

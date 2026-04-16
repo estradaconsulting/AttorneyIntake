@@ -278,7 +278,7 @@ public class IntakeCasesController : ControllerBase
         c.Property,
         c.EvictionCause,
         c.NoticeRequest,
-        c.Documents
+        c.Documents.ToList()
     );
 
     private static PropertyOwner MapOwner(PropertyOwnerDto d) => new()
