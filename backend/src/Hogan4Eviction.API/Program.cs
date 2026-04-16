@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using Hogan4Eviction.API.Security;
 using Hogan4Eviction.Infrastructure;
+using Hogan4Eviction.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -9,7 +10,10 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(opts =>
+        opts.JsonSerializerOptions.ReferenceHandler =
+            System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles);
 builder.Services.AddEndpointsApiExplorer();
 
 // M-08: Swagger only when explicitly enabled in config
@@ -133,6 +137,9 @@ var app = builder.Build();
 
 var autoMigrate = builder.Configuration.GetValue<bool>("Database:AutoMigrate");
 if (autoMigrate) app.Services.ApplyMigrations();
+
+// Seed sample cases when running against InMemory DB (dev/demo only — no-op on SqlServer)
+await DataSeeder.SeedAsync(app.Services);
 
 if (swaggerEnabled)
 {
